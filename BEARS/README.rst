@@ -14,10 +14,6 @@ BEARS
         :alt: Documentation Status
 
 
-.. image:: https://pyup.io/repos/github/housw/bears/shield.svg
-     :target: https://pyup.io/repos/github/housw/bears/
-     :alt: Updates
-
 
 
 Binning mEtagenomic contigs via iterAtive hieRarchical dbScan

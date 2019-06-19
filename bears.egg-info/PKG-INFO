@@ -22,6 +22,10 @@ Description: =====
                 :alt: Documentation Status
         
         
+        .. image:: https://pyup.io/repos/github/housw/bears/shield.svg
+             :target: https://pyup.io/repos/github/housw/bears/
+             :alt: Updates
+        
         
         
         Binning mEtagenomic contigs via iterAtive hieRarchical dbScan
@@ -49,7 +53,7 @@ Description: =====
         History
         =======
         
-        0.1.0 (2019-06-03)
+        0.1.0 (2019-06-07)
         ------------------
         
         * First release on PyPI.
