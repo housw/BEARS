@@ -9,6 +9,7 @@ setup.py
 bears/__init__.py
 bears/bears.py
 bears/cli.py
+bears/utils.py
 bears.egg-info/PKG-INFO
 bears.egg-info/SOURCES.txt
 bears.egg-info/dependency_links.txt

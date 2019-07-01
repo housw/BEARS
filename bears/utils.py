@@ -85,7 +85,7 @@ class SpecialHelpOrder(click.Group):
         return (c[1] for c in sorted(
             (self.help_priorities.get(command, 1), command)
             for command in commands))
-
+    
     def command(self, *args, **kwargs):
         """Behaves the same as `click.Group.command()` except capture
         a priority for listing command names in help.
@@ -99,3 +99,7 @@ class SpecialHelpOrder(click.Group):
             return cmd
 
         return decorator
+    
+    def add_command(self, *args, **kwargs):
+        """overwrite the add_command method to allow help_priority parameter"""
+        return self.command(*args, **kwargs)
