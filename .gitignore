@@ -1,5 +1,6 @@
 # pycharm
 .idea/
+tests/bears_results
 
 # vscode
 .vscode
