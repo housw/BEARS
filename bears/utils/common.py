@@ -134,8 +134,12 @@ class CommandWrapper(object):
         _cmd_line = [self.name]
         for option, value in self.options.items():
             _cmd_line.extend([option_prefix_char + option, str(value)])
-        for flag in self.flags:
-            _cmd_line.append(flag_prefix_char + flag)
+        if self.flags:
+            for flag in self.flags:
+                _cmd_line.append(flag_prefix_char + flag)
+        if self.arguments:
+            for argument in self.arguments:
+                _cmd_line.append(argument)
         self.cmd_line = _cmd_line
         return _cmd_line
 
@@ -214,3 +218,28 @@ def normalizer(input_freq_file, output_dir, prefix, scale_func=np.cbrt):
     scaled_freq_df.to_csv(output_norm_freq_file, sep="\t", header=True, index=True, float_format='%.6f')
 
     return output_norm_freq_file
+
+
+def combine_feature_tables(feature_file_list, output_dir, prefix, force=False):
+
+    output_file = os.path.join(output_dir, prefix + "_merged.tsv")
+    #if os.path.exists(output_file):
+    #    if not force:
+    #        err_msg = "{0} exists, use --force if you want to re-generate the merged feature table".format(output_file)
+    #        _logger.warn(err_msg)
+    #        raise CommandException(err_msg)
+    #    else:
+    #        warn_msg = "re-generate the merged feature table, {0} will be over-writen".format(output_file)
+    #        _logger.warn(warn_msg)
+
+    all_feature_dfs = []
+    for feature_file in feature_file_list:
+        curr_df = pd.read_csv(feature_file, sep='\t', header=0, index_col=0)
+        curr_df.sort_index(inplace=True)
+        all_feature_dfs.append(curr_df)
+
+    combined_df = pd.concat(all_feature_dfs, axis=1, sort=True)
+    combined_df.index.name = "Contig_ID"
+    combined_df.to_csv(output_file, sep="\t", header=True, index=True)
+
+    return output_file

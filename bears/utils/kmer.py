@@ -2,18 +2,17 @@
 
 
 import os
-import sys
 import pymer
-import argparse
-import numpy as np
+import logging
 import pandas as pd
 from Bio import SeqIO
 import multiprocessing as mp
-from sklearn import preprocessing
-from MulticoreTSNE import MulticoreTSNE as TSNE
 from .common import folder_exists
 from .common import create_directory
 from .common import CommandException
+
+
+_logger = logging.getLogger("bears")
 
 
 def get_kmer_count_per_contig(contig, ksize=5):
@@ -35,6 +34,16 @@ def get_kmer_counts_for_contigs(input_contig_file, output_dir, prefix, k=5, cpus
     if not folder_exists(output_dir):
         create_directory(output_dir)
     output_kmer_freq = os.path.join(output_dir, prefix + ".kmerfreq")
+
+    if os.path.exists(output_kmer_freq):
+        if not force:
+            err_msg = "{0} exists, use --force if you want to re-generate kmer frequency".format(output_kmer_freq)
+            _logger.error(err_msg)
+            raise CommandException(err_msg)
+        else:
+            warn_msg = "re-generate kmer frequency, {0} will be over-writen".format(output_kmer_freq)
+            _logger.warn(warn_msg)
+
 
     # do kmer count with multiple cores using mp
     contig_iter = SeqIO.parse(input_contig_file, "fasta")

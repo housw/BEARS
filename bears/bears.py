@@ -16,8 +16,13 @@ from .utils import get_prefix
 from .utils import command_logger
 from .utils.codon import get_codon_frequencies_for_contigs
 from .utils.common import normalizer
+from .utils.common import combine_feature_tables
+from .utils.coordinate import compute_PCA_tSNE_coordinates
 from .utils.coordinate import compute_tSNE_coordinates
 from .utils.kmer import get_kmer_counts_for_contigs
+from .utils.cov import calculate_contig_depth_from_bam_files
+from .utils.cov import normalize_contig_depth
+
 
 _logger = logging.getLogger("bears")
 
@@ -71,8 +76,6 @@ shared_options = [
     click.option('-p', '--prefix', help="output prefix", type=str), 
     click.option('-o', '--output_dir', help="output directory", default="./bears_results", show_default=True),
     click.option('-f', '--force', is_flag=True, default=False, help="force to overwrite the output file"), 
-    click.option('-l', '--length_threshold', type=int, default=2000, show_default=True, 
-    help="minimum contig length threshold"),
     click.option('-l', '--loglevel', default='debug', show_default=True,
         type=click.Choice(['critical', 'error', 'warning', 'info', 'debug'])),
     click.version_option(version="0.1.0", prog_name="bears", message="%(prog)s, version %(version)s")
@@ -86,7 +89,7 @@ shared_options = [
     show_default=True, help="k-mer size")
 @click.option('-c', '--cpus', type=int, default=20, show_default=True, help="number of cores to use for kmer counting")
 @add_options(shared_options)
-def kmer(assembly, kmer_size, prefix, output_dir, length_threshold, force, cpus, loglevel, *args, **kwargs):
+def kmer(assembly, kmer_size, prefix, output_dir, force, cpus, loglevel, *args, **kwargs):
     """k-mer frequency profiling"""
     emit_subcommand_info("profile kmer", loglevel)
 
@@ -95,15 +98,15 @@ def kmer(assembly, kmer_size, prefix, output_dir, length_threshold, force, cpus,
 
     # run kmer freq calculation
     kmer_freq_file = get_kmer_counts_for_contigs(input_contig_file=assembly, output_dir=output_dir, prefix=prefix,
-                                                 k=kmer_size, cpus=cpus, force=False)
+                                                 k=kmer_size, cpus=cpus, force=force)
 
     # normalization
-    norm_freq_file = normalizer(input_freq_file=kmer_freq_file, output_dir=output_dir, prefix=prefix+"_kmerfreq", scale_func=np.cbrt)
+    norm_kmer_file = normalizer(input_freq_file=kmer_freq_file, output_dir=output_dir, prefix=prefix+"_kmerfreq", scale_func=np.cbrt)
 
     # t-SNE
-    tSNE_freq_file = compute_tSNE_coordinates(codon_freq_file=norm_freq_file, output_dir=output_dir,
-                                              prefix=prefix+"_kmerfreq_norm", threads=20, force=force,
-                                              columns=['KmerFreq_tSNE_X', 'KmerFreq_tSNE_Y'])
+    #tSNE_freq_file = compute_tSNE_coordinates(freq_file=norm_kmer_file, output_dir=output_dir,
+    #                                          prefix=prefix+"_kmerfreq_norm", threads=cpus, force=force,
+    #                                          columns=['KmerFreq_tSNE_X', 'KmerFreq_tSNE_Y'])
 
 
 
@@ -111,7 +114,7 @@ def kmer(assembly, kmer_size, prefix, output_dir, length_threshold, force, cpus,
 @profile.command()
 @click.argument('assembly', type=str)
 @add_options(shared_options)
-def codon(assembly, prefix, output_dir, length_threshold, force, loglevel, *args, **kwargs):
+def codon(assembly, prefix, output_dir, force, loglevel, *args, **kwargs):
     """codon usage profiling"""
     emit_subcommand_info("profile codon", loglevel)
 
@@ -127,38 +130,64 @@ def codon(assembly, prefix, output_dir, length_threshold, force, loglevel, *args
                                                         prefix = prefix, genetic_code=11, force=force)
 
     # normalization
-    norm_freq_file = normalizer(input_freq_file=codon_freq_file, output_dir=output_dir, prefix=prefix+"_codonfreq", scale_func=np.cbrt)
+    norm_codon_file = normalizer(input_freq_file=norm_codon_file, output_dir=output_dir, prefix=prefix+"_codonfreq", scale_func=np.cbrt)
 
     # t-SNE
-    tSNE_freq_file = compute_tSNE_coordinates(codon_freq_file=norm_freq_file, output_dir=output_dir,
-                                              prefix=prefix+"_codonfreq_norm", threads=20, force=force,
-                                              columns=['CodonFreq_tSNE_X', 'CodonFreq_tSNE_Y'])
+    #tSNE_freq_file = compute_tSNE_coordinates(freq_file=norm_freq_file, output_dir=output_dir,
+    #                                          prefix=prefix+"_codonfreq_norm", threads=20, force=force,
+    #                                          columns=['CodonFreq_tSNE_X', 'CodonFreq_tSNE_Y'])
 
 # profile cov
 @profile.command()
 @click.argument('bam_files', type=str, nargs=-1)
+@click.option('-l', '--read_length', type=int, default=250, show_default=True, help="read length for log-scaled transformation")
 @add_options(shared_options)
-def cov(bam_files, prefix, output_dir, length_threshold, force, loglevel, *args, **kwargs):
+def cov(bam_files, prefix, output_dir, force, loglevel, *args, **kwargs):
     """read coverage profiling"""
     emit_subcommand_info("profile cov", loglevel)
-    pass
 
+    if not prefix:
+        prefix = "bamcov"
+
+    # run bamcov
+    length_file, depth_file = calculate_contig_depth_from_bam_files(bam_files, output_dir=output_dir,
+                                                                    output_prefix=prefix, min_read_len=30,
+                                                                    min_MQ=0, min_BQ=0, force=force)
+    # normalization
+    norm_depth_file = normalize_contig_depth(length_file, depth_file, output_dir, prefix, scale_func=np.log10, read_length=250)
+
+    # t-SNE
+    #tSNE_freq_file = compute_tSNE_coordinates(freq_file=norm_depth_file, output_dir=output_dir,
+    #                                          prefix=prefix+"_depth_norm", threads=20, force=force,
+    #                                          columns=['Depth_tSNE_X', 'Depth_tSNE_Y'])
 
 # bin hdbscan
 @bin.command()
-@click.argument('tsne_profile', type=str)
+@click.argument('kmerfreq_file', type=str)
+@click.argument('codonfreq_file', type=str)
+@click.argument('depth_file', type=str)
 @click.option('-x', '--min_length_x', type=int, default=2000, show_default=True,
     help="minimum contig length threshold x")
 @click.option('-y', '--min_length_y', type=int, default=10000, show_default=True, 
     help="minimum contig length threshold y")
 @add_options(shared_options)
-def hdbscan(tsne_profile, min_length_x, min_length_y, prefix, output_dir, length_threshold, force, loglevel, *args, **kwargs):
+def hdbscan(kmerfreq_file, codonfreq_file, depth_file, min_length_x, min_length_y, prefix, output_dir, force, loglevel, *args, **kwargs):
     """hdbscan binning"""
     emit_subcommand_info("bin hdbscan", loglevel)
-    pass
+
+    if not prefix:
+        prefix = "hdbscan"
+
+    # merge kmer, codon and depth profiles
+    merged_profile = combine_feature_tables([kmerfreq_file, codonfreq_file, depth_file], output_dir=output_dir, prefix=prefix, force=force)
+
+    # run t-SNE
+    tsne_file = compute_PCA_tSNE_coordinates(merged_profile, output_dir, prefix, threads=20, n_components=100)
 
 
-# bin umap
+
+# https://arxiv.org/pdf/1810.13105.pdf
+# bin dbscanpp
 @bin.command()
 @click.argument('tsne_profile', type=str)
 @click.option('-x', '--min_length_x', type=int, default=2000, show_default=True,
@@ -166,9 +195,9 @@ def hdbscan(tsne_profile, min_length_x, min_length_y, prefix, output_dir, length
 @click.option('-y', '--min_length_y', type=int, default=10000, show_default=True, 
     help="minimum contig length threshold y")
 @add_options(shared_options)
-def umap(tsne_profile, min_length_x, min_length_y, prefix, output_dir, length_threshold, force, loglevel, *args, **kwargs):
-    """umap binning"""
-    emit_subcommand_info("bin umap", loglevel)
+def dbscanpp(tsne_profile, min_length_x, min_length_y, prefix, output_dir, length_threshold, force, loglevel, *args, **kwargs):
+    """dbscan++ binning"""
+    emit_subcommand_info("bin dbscanpp", loglevel)
     pass
 
 
