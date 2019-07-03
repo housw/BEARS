@@ -7,6 +7,7 @@ import click
 import logging
 import subprocess
 import numpy as np
+import pandas as pd
 from .utils import add_options
 from .utils import setup_logging
 from .utils import CommandWrapper
@@ -22,6 +23,8 @@ from .utils.coordinate import compute_tSNE_coordinates
 from .utils.kmer import get_kmer_counts_for_contigs
 from .utils.cov import calculate_contig_depth_from_bam_files
 from .utils.cov import normalize_contig_depth
+from .utils.hdbscan import hdbscan_clustering
+from .utils.hdbscan import generate_bins
 
 
 _logger = logging.getLogger("bears")
@@ -51,7 +54,7 @@ def main(*args, **kwargs):
     \b
     -> bears bin COMMAND [ARGS] ...
       -> bears bin hdbscan:    run hdbscan binning
-      -> bears bin umap:       run umap binning
+      -> bears bin dbscanpp:   run dbscan++ binning
 
     """
     pass
@@ -166,12 +169,16 @@ def cov(bam_files, prefix, output_dir, force, loglevel, *args, **kwargs):
 @click.argument('kmerfreq_file', type=str)
 @click.argument('codonfreq_file', type=str)
 @click.argument('depth_file', type=str)
+@click.argument('contig_length_file', type=str)
+@click.argument('assembly', type=str)
 @click.option('-x', '--min_length_x', type=int, default=2000, show_default=True,
     help="minimum contig length threshold x")
 @click.option('-y', '--min_length_y', type=int, default=10000, show_default=True, 
     help="minimum contig length threshold y")
+@click.option('-s', '--length_step', type=int, default=1000, show_default=True,
+    help="minimum contig length increasement step")
 @add_options(shared_options)
-def hdbscan(kmerfreq_file, codonfreq_file, depth_file, min_length_x, min_length_y, prefix, output_dir, force, loglevel, *args, **kwargs):
+def hdbscan(kmerfreq_file, codonfreq_file, depth_file, contig_length_file, assembly, min_length_x, min_length_y, length_step, prefix, output_dir, force, loglevel, *args, **kwargs):
     """hdbscan binning"""
     emit_subcommand_info("bin hdbscan", loglevel)
 
@@ -182,7 +189,17 @@ def hdbscan(kmerfreq_file, codonfreq_file, depth_file, min_length_x, min_length_
     merged_profile = combine_feature_tables([kmerfreq_file, codonfreq_file, depth_file], output_dir=output_dir, prefix=prefix, force=force)
 
     # run t-SNE
-    tsne_file = compute_PCA_tSNE_coordinates(merged_profile, output_dir, prefix, threads=20, n_components=100)
+    tsne_file = compute_PCA_tSNE_coordinates(merged_profile, output_dir, prefix+"_merged", threads=20, n_components=100)
+
+    # run hdbscan
+    length_df = pd.read_csv(contig_length_file, sep="\t", index_col=0, header=0)
+    for min_length in range(min_length_x, min_length_y+1, length_step):
+        print(min_length)
+        drop_length_df = length_df[length_df.Length < min_length]
+        drop_contig_list = drop_length_df.index
+        hdbscan_cluster_file = hdbscan_clustering(tsne_file, output_dir, prefix+"_merged_tSNE_min_{}".format(min_length), excluding_contig_file_or_list=drop_contig_list, min_cluster_size=10)
+        # generate bins
+        generate_bins(hdbscan_cluster_file, assembly, output_dir, bin_folder=prefix+"_merged_tSNE_min_{}".format(min_length))
 
 
 

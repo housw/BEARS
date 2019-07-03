@@ -2,6 +2,7 @@
 .idea/
 tests/bears_results
 tests/bam_files
+tests/PTR_assembly.fasta
 
 # vscode
 .vscode
