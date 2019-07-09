@@ -4,9 +4,9 @@ import os
 import logging
 from Bio import SeqIO
 from freqgen import k_mer_frequencies, codon_frequencies, genetic_codes
-from .common import folder_exists
-from .common import create_directory
-from .common import CommandException
+from bears.utils.common import folder_exists
+from bears.utils.common import create_directory
+from bears.utils.common import CommandException
 
 
 _logger = logging.getLogger("bears")

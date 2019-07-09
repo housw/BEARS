@@ -5,26 +5,21 @@ import os
 import sys
 import click
 import logging
-import subprocess
 import numpy as np
 import pandas as pd
 from .utils import add_options
 from .utils import setup_logging
-from .utils import CommandWrapper
-from .utils import SpecialHelpOrder
 from .utils import run_prodigal
 from .utils import get_prefix
-from .utils import command_logger
-from .utils.codon import get_codon_frequencies_for_contigs
+from .commands.profile import get_codon_frequencies_for_contigs
+from .commands.profile import get_kmer_counts_for_contigs
+from .commands.profile import calculate_contig_depth_from_bam_files
+from .commands.profile import normalize_contig_depth
+from .commands.bin import hdbscan_clustering
+from .commands.bin import generate_bins
 from .utils.common import normalizer
 from .utils.common import combine_feature_tables
 from .utils.coordinate import compute_PCA_tSNE_coordinates
-from .utils.coordinate import compute_tSNE_coordinates
-from .utils.kmer import get_kmer_counts_for_contigs
-from .utils.cov import calculate_contig_depth_from_bam_files
-from .utils.cov import normalize_contig_depth
-from .utils.hdbscan import hdbscan_clustering
-from .utils.hdbscan import generate_bins
 
 
 _logger = logging.getLogger("bears")
@@ -32,7 +27,7 @@ _logger = logging.getLogger("bears")
 
 def emit_subcommand_info(subcommand, loglevel):
     setup_logging(loglevel)
-    _logger.info('invoking {0} subcommand'.format(subcommand))
+    _logger.info('invoking {0} subcommand ...'.format(subcommand))
 
 
 # entry point
@@ -76,7 +71,7 @@ def bin(ctx, *args, **kwargs):
 
 # global shared options
 shared_options = [
-    click.option('-p', '--prefix', help="output prefix", type=str), 
+    click.option('-p', '--prefix', help="output prefix", default="assembly", type=str, show_default=True),
     click.option('-o', '--output_dir', help="output directory", default="./bears_results", show_default=True),
     click.option('-f', '--force', is_flag=True, default=False, help="force to overwrite the output file"), 
     click.option('-l', '--loglevel', default='debug', show_default=True,
@@ -96,15 +91,16 @@ def kmer(assembly, kmer_size, prefix, output_dir, force, cpus, loglevel, *args, 
     """k-mer frequency profiling"""
     emit_subcommand_info("profile kmer", loglevel)
 
-    if not prefix:
-        prefix = get_prefix(assembly)
+    prefix = prefix + "_kmer"
 
     # run kmer freq calculation
+    _logger.info("calculating kmer frequency ...")
     kmer_freq_file = get_kmer_counts_for_contigs(input_contig_file=assembly, output_dir=output_dir, prefix=prefix,
                                                  k=kmer_size, cpus=cpus, force=force)
 
     # normalization
-    norm_kmer_file = normalizer(input_freq_file=kmer_freq_file, output_dir=output_dir, prefix=prefix+"_kmerfreq", scale_func=np.cbrt)
+    _logger.info("normalizing kmer frequency ...")
+    norm_kmer_file = normalizer(input_freq_file=kmer_freq_file, output_dir=output_dir, prefix=prefix, scale_func=np.cbrt)
 
     # t-SNE
     #tSNE_freq_file = compute_tSNE_coordinates(freq_file=norm_kmer_file, output_dir=output_dir,
@@ -121,19 +117,21 @@ def codon(assembly, prefix, output_dir, force, loglevel, *args, **kwargs):
     """codon usage profiling"""
     emit_subcommand_info("profile codon", loglevel)
 
-    if not prefix:
-        prefix = get_prefix(assembly)
+    prefix = prefix + "_codon"
 
     # run prodigal
+    _logger.info("predicting coding genes using prodigal ...")
     prodigal_file, prodigal_gene, prodigal_prot = \
         run_prodigal(assembly, prefix=prefix, output_dir=output_dir, output_fmt='gbk', flags=['m'], force=force)
 
     # run codon usage calculation
+    _logger.info("calculating codon frequency ...")
     codon_freq_file = get_codon_frequencies_for_contigs(input_prodigal_nucl_file=prodigal_gene, output_dir=output_dir,
                                                         prefix = prefix, genetic_code=11, force=force)
 
     # normalization
-    norm_codon_file = normalizer(input_freq_file=norm_codon_file, output_dir=output_dir, prefix=prefix+"_codonfreq", scale_func=np.cbrt)
+    _logger.info("normalizing codon frequency ...")
+    norm_codon_file = normalizer(input_freq_file=codon_freq_file, output_dir=output_dir, prefix=prefix, scale_func=np.cbrt)
 
     # t-SNE
     #tSNE_freq_file = compute_tSNE_coordinates(freq_file=norm_freq_file, output_dir=output_dir,
@@ -149,14 +147,15 @@ def cov(bam_files, prefix, output_dir, force, loglevel, *args, **kwargs):
     """read coverage profiling"""
     emit_subcommand_info("profile cov", loglevel)
 
-    if not prefix:
-        prefix = "bamcov"
+    prefix = prefix + "_cov"
 
     # run bamcov
+    _logger.info("calculating contig coverage using bamcov ...")
     length_file, depth_file = calculate_contig_depth_from_bam_files(bam_files, output_dir=output_dir,
                                                                     output_prefix=prefix, min_read_len=30,
                                                                     min_MQ=0, min_BQ=0, force=force)
     # normalization
+    _logger.info("normalizing contig coverage ...")
     norm_depth_file = normalize_contig_depth(length_file, depth_file, output_dir, prefix, scale_func=np.log10, read_length=250)
 
     # t-SNE
@@ -182,25 +181,28 @@ def hdbscan(kmerfreq_file, codonfreq_file, depth_file, contig_length_file, assem
     """hdbscan binning"""
     emit_subcommand_info("bin hdbscan", loglevel)
 
-    if not prefix:
-        prefix = "hdbscan"
+    prefix = prefix + "_hdbscan"
 
     # merge kmer, codon and depth profiles
-    merged_profile = combine_feature_tables([kmerfreq_file, codonfreq_file, depth_file], output_dir=output_dir, prefix=prefix, force=force)
+    _logger.info("combining kmer, codon and coverage profiles ...")
+    #merged_profile = combine_feature_tables([kmerfreq_file, codonfreq_file, depth_file], output_dir=output_dir, prefix=prefix, force=force)
+    merged_profile = os.path.join(output_dir, prefix+"_merged.tsv")
 
     # run t-SNE
+    _logger.info("computing t-SNE coordinates ...")
     tsne_file = compute_PCA_tSNE_coordinates(merged_profile, output_dir, prefix+"_merged", threads=20, n_components=100)
 
     # run hdbscan
+     _logger.info("clustering using hdbscan ...")
     length_df = pd.read_csv(contig_length_file, sep="\t", index_col=0, header=0)
     for min_length in range(min_length_x, min_length_y+1, length_step):
-        print(min_length)
+         _logger.info("clustering using hdbscan with contigs >= {l} ...".format(l=min_length))
         drop_length_df = length_df[length_df.Length < min_length]
         drop_contig_list = drop_length_df.index
         hdbscan_cluster_file = hdbscan_clustering(tsne_file, output_dir, prefix+"_merged_tSNE_min_{}".format(min_length), excluding_contig_file_or_list=drop_contig_list, min_cluster_size=10)
         # generate bins
+         _logger.info("generating bins for contigs >= {l} ...".format(l=min_length))
         generate_bins(hdbscan_cluster_file, assembly, output_dir, bin_folder=prefix+"_merged_tSNE_min_{}".format(min_length))
-
 
 
 # https://arxiv.org/pdf/1810.13105.pdf

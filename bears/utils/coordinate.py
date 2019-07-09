@@ -4,6 +4,7 @@ import os
 import sys
 import pymer
 import argparse
+import logging
 import numpy as np
 import pandas as pd
 from Bio import SeqIO
@@ -12,6 +13,12 @@ from sklearn import preprocessing
 from sklearn import decomposition
 from MulticoreTSNE import MulticoreTSNE as TSNE
 import umap
+
+import warnings
+warnings.filterwarnings(action="ignore", category=DeprecationWarning, module='sklearn')  # message="divide by zero encountered in divide")
+
+
+_logger = logging.getLogger("bears")
 
 
 def compute_PCA_tSNE_coordinates(input_feature_table, output_dir, prefix, threads=20, n_components=100):

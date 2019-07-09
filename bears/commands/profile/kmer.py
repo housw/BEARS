@@ -7,9 +7,9 @@ import logging
 import pandas as pd
 from Bio import SeqIO
 import multiprocessing as mp
-from .common import folder_exists
-from .common import create_directory
-from .common import CommandException
+from bears.utils.common import folder_exists
+from bears.utils.common import create_directory
+from bears.utils.common import CommandException
 
 
 _logger = logging.getLogger("bears")

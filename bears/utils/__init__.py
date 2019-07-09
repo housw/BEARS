@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from .common import add_options
 from .common import setup_logging
 from .common import CommandWrapper

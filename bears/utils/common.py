@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 from functools import wraps
 from sklearn import preprocessing
+import warnings
+warnings.filterwarnings(action="ignore", category=DeprecationWarning, module='sklearn')  # message="divide by zero encountered in divide")
 
 
 _logger = logging.getLogger("bears")

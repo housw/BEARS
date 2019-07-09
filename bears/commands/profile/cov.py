@@ -5,8 +5,8 @@ import logging
 import numpy as np
 import pandas as pd
 from MulticoreTSNE import MulticoreTSNE as TSNE
-from .external import run_bamcov
-from .common import normalizer
+from bears.utils.external import run_bamcov
+from bears.utils.common import normalizer
 
 
 _logger = logging.getLogger("bears")
@@ -36,13 +36,14 @@ def calculate_contig_depth_from_bam_files(input_bam_file_list, output_dir, outpu
     length_df.to_csv(output_length_file, sep='\t', header=True, index=True)
 
     # merge depth profiles and write depth file
-    output_depth_file = os.path.join(output_dir, output_prefix+"_depth.tsv")
+    output_depth_file = os.path.join(output_dir, output_prefix+".tsv")
     all_depth_dfs = []
     shape = None
     for i, depth_file in enumerate(depth_files):
         curr_depth_df = pd.read_csv(depth_file, sep='\t', header=0, index_col=0).meandepth.rename(sample_names[i])
         if not shape:
             shape = curr_depth_df.shape
+            all_depth_dfs.append(curr_depth_df)
         else:
             if curr_depth_df.shape == shape:
                 all_depth_dfs.append(curr_depth_df)
@@ -50,7 +51,6 @@ def calculate_contig_depth_from_bam_files(input_bam_file_list, output_dir, outpu
                 sample_id = sample_names[i]
                 _logger.error("sample {0} has a different dimension, this sample is temporarily ignored, "
                               "please re-generate the bam and bamcov files if you want to include it".format(sample_id))
-        all_depth_dfs.append(curr_depth_df)
     _logger.info("concatenating coverage from all the samples ...")
     depth_df = pd.concat(all_depth_dfs, axis=1)
     depth_df.index.name="Contig_ID"
@@ -70,7 +70,7 @@ def normalize_contig_depth(input_length_file, input_depth_file, output_dir, outp
     depth_df.sort_index(inplace=True)
 
     # add 1 read prior to depth_df,
-    prior_depth_file  = os.path.join(output_dir, output_prefix + "_prior.tsv")
+    prior_depth_file  = os.path.join(output_dir, output_prefix + ".prior")
     prior_df = read_length / length_df.Length
     for col in depth_df.columns:
         depth_df[col] += prior_df
