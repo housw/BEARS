@@ -20,6 +20,9 @@ from .commands.bin import generate_bins
 from .utils.common import normalizer
 from .utils.common import combine_feature_tables
 from .utils.coordinate import compute_PCA_tSNE_coordinates
+from .utils.coordinate import compute_PCA_UMAP_coordinates
+from .utils.common import scaffolds_to_bins
+from .utils.external import run_das_tool
 
 
 _logger = logging.getLogger("bears")
@@ -49,7 +52,6 @@ def main(*args, **kwargs):
     \b
     -> bears bin COMMAND [ARGS] ...
       -> bears bin hdbscan:    run hdbscan binning
-      -> bears bin dbscanpp:   run dbscan++ binning
 
     """
     pass
@@ -92,6 +94,7 @@ def kmer(assembly, kmer_size, prefix, output_dir, force, cpus, loglevel, *args, 
     emit_subcommand_info("profile kmer", loglevel)
 
     prefix = prefix + "_kmer"
+    output_dir = os.path.join(output_dir, "kmer")
 
     # run kmer freq calculation
     _logger.info("calculating kmer frequency ...")
@@ -101,12 +104,6 @@ def kmer(assembly, kmer_size, prefix, output_dir, force, cpus, loglevel, *args, 
     # normalization
     _logger.info("normalizing kmer frequency ...")
     norm_kmer_file = normalizer(input_freq_file=kmer_freq_file, output_dir=output_dir, prefix=prefix, scale_func=np.cbrt)
-
-    # t-SNE
-    #tSNE_freq_file = compute_tSNE_coordinates(freq_file=norm_kmer_file, output_dir=output_dir,
-    #                                          prefix=prefix+"_kmerfreq_norm", threads=cpus, force=force,
-    #                                          columns=['KmerFreq_tSNE_X', 'KmerFreq_tSNE_Y'])
-
 
 
 # profile codon
@@ -118,6 +115,8 @@ def codon(assembly, prefix, output_dir, force, loglevel, *args, **kwargs):
     emit_subcommand_info("profile codon", loglevel)
 
     prefix = prefix + "_codon"
+    output_dir = os.path.join(output_dir, "codon")
+
 
     # run prodigal
     _logger.info("predicting coding genes using prodigal ...")
@@ -133,10 +132,6 @@ def codon(assembly, prefix, output_dir, force, loglevel, *args, **kwargs):
     _logger.info("normalizing codon frequency ...")
     norm_codon_file = normalizer(input_freq_file=codon_freq_file, output_dir=output_dir, prefix=prefix, scale_func=np.cbrt)
 
-    # t-SNE
-    #tSNE_freq_file = compute_tSNE_coordinates(freq_file=norm_freq_file, output_dir=output_dir,
-    #                                          prefix=prefix+"_codonfreq_norm", threads=20, force=force,
-    #                                          columns=['CodonFreq_tSNE_X', 'CodonFreq_tSNE_Y'])
 
 # profile cov
 @profile.command()
@@ -148,20 +143,18 @@ def cov(bam_files, prefix, output_dir, force, loglevel, *args, **kwargs):
     emit_subcommand_info("profile cov", loglevel)
 
     prefix = prefix + "_cov"
+    output_dir = os.path.join(output_dir, "cov")
 
     # run bamcov
     _logger.info("calculating contig coverage using bamcov ...")
     length_file, depth_file = calculate_contig_depth_from_bam_files(bam_files, output_dir=output_dir,
                                                                     output_prefix=prefix, min_read_len=30,
                                                                     min_MQ=0, min_BQ=0, force=force)
+
     # normalization
     _logger.info("normalizing contig coverage ...")
     norm_depth_file = normalize_contig_depth(length_file, depth_file, output_dir, prefix, scale_func=np.log10, read_length=250)
 
-    # t-SNE
-    #tSNE_freq_file = compute_tSNE_coordinates(freq_file=norm_depth_file, output_dir=output_dir,
-    #                                          prefix=prefix+"_depth_norm", threads=20, force=force,
-    #                                          columns=['Depth_tSNE_X', 'Depth_tSNE_Y'])
 
 # bin hdbscan
 @bin.command()
@@ -176,49 +169,76 @@ def cov(bam_files, prefix, output_dir, force, loglevel, *args, **kwargs):
     help="minimum contig length threshold y")
 @click.option('-s', '--length_step', type=int, default=1000, show_default=True,
     help="minimum contig length increasement step")
+@click.option('-t', '--threads', type=int, default=20, show_default=True,
+    help="maximum number of threads to use when available")
+@click.option('-d', '--dimred', default='both', show_default=True,
+             type=click.Choice(['tsne', 'umap', 'both']),
+             help="dimension reduction methods, can be 'tsne', 'umap' or 'both'")
+@click.option('--dimensions', type=int, default=3, show_default=True,
+             help="number of dimensions to keep for embedding")
+@click.option('--components', type=int, default=100, show_default=True,
+             help="maximum PCA components to keep")
 @add_options(shared_options)
-def hdbscan(kmerfreq_file, codonfreq_file, depth_file, contig_length_file, assembly, min_length_x, min_length_y, length_step, prefix, output_dir, force, loglevel, *args, **kwargs):
+def hdbscan(kmerfreq_file, codonfreq_file, depth_file, contig_length_file, assembly, min_length_x, min_length_y, length_step,
+            threads, prefix, output_dir, force, loglevel, dimred, dimensions, components, *args, **kwargs):
     """hdbscan binning"""
     emit_subcommand_info("bin hdbscan", loglevel)
 
     prefix = prefix + "_hdbscan"
+    output_dir = os.path.join(output_dir, "hdbscan")
+
 
     # merge kmer, codon and depth profiles
     _logger.info("combining kmer, codon and coverage profiles ...")
-    #merged_profile = combine_feature_tables([kmerfreq_file, codonfreq_file, depth_file], output_dir=output_dir, prefix=prefix, force=force)
+    merged_profile = combine_feature_tables([kmerfreq_file, codonfreq_file, depth_file], output_dir=output_dir, prefix=prefix, force=force)
     merged_profile = os.path.join(output_dir, prefix+"_merged.tsv")
 
-    # run t-SNE
-    _logger.info("computing t-SNE coordinates ...")
-    tsne_file = compute_PCA_tSNE_coordinates(merged_profile, output_dir, prefix+"_merged", threads=20, n_components=100)
-
-    # run hdbscan
-     _logger.info("clustering using hdbscan ...")
-    length_df = pd.read_csv(contig_length_file, sep="\t", index_col=0, header=0)
-    for min_length in range(min_length_x, min_length_y+1, length_step):
-         _logger.info("clustering using hdbscan with contigs >= {l} ...".format(l=min_length))
-        drop_length_df = length_df[length_df.Length < min_length]
-        drop_contig_list = drop_length_df.index
-        hdbscan_cluster_file = hdbscan_clustering(tsne_file, output_dir, prefix+"_merged_tSNE_min_{}".format(min_length), excluding_contig_file_or_list=drop_contig_list, min_cluster_size=10)
-        # generate bins
-         _logger.info("generating bins for contigs >= {l} ...".format(l=min_length))
-        generate_bins(hdbscan_cluster_file, assembly, output_dir, bin_folder=prefix+"_merged_tSNE_min_{}".format(min_length))
+    feature_files = []
+    if dimred in ('tsne', 'both'):
+        # run t-SNE
+        _logger.info("computing t-SNE coordinates after PCA ...")
+        tsne_file = compute_PCA_tSNE_coordinates(merged_profile, output_dir, prefix+"_merged_{}d".format(dimensions), threads=threads, n_components=dimensions, pca_components=components)
+        #tsne_file =  os.path.join(output_dir, prefix+"_merged_{}d.tsne".format(dimensions))
+        feature_files.append(tsne_file)
+    if dimred in ('umap', 'both'):
+        # run UMAP
+        _logger.info("computing UMAP coordinates after PCA ...")
+        umap_file = compute_PCA_UMAP_coordinates(merged_profile, output_dir, prefix+"_merged_{}d".format(dimensions), n_components=dimensions, pca_components=components)
+        #umap_file = os.path.join(output_dir, prefix + "_merged_{}d.umap".format(dimensions))
+        feature_files.append(umap_file)
 
 
-# https://arxiv.org/pdf/1810.13105.pdf
-# bin dbscanpp
-@bin.command()
-@click.argument('tsne_profile', type=str)
-@click.option('-x', '--min_length_x', type=int, default=2000, show_default=True,
-    help="minimum contig length threshold x")
-@click.option('-y', '--min_length_y', type=int, default=10000, show_default=True, 
-    help="minimum contig length threshold y")
-@add_options(shared_options)
-def dbscanpp(tsne_profile, min_length_x, min_length_y, prefix, output_dir, length_threshold, force, loglevel, *args, **kwargs):
-    """dbscan++ binning"""
-    emit_subcommand_info("bin dbscanpp", loglevel)
-    pass
+    scaffold2bin_files = []
+    bin_folders = []
+    for feature_file in feature_files:
+        dimred_method = feature_file.split('.')[-1]
+        _logger.info("clustering using hdbscan based on {0} feature file ...".format(dimred_method))
+        length_df = pd.read_csv(contig_length_file, sep="\t", index_col=0, header=0)
+        for min_length in range(min_length_x, min_length_y+1, length_step):
+            _logger.info("clustering using hdbscan with contigs >= {l} ...".format(l=min_length))
+            drop_length_df = length_df[length_df.Length < min_length]
+            drop_contig_list = drop_length_df.index
+            hdbscan_cluster_file = hdbscan_clustering(feature_file, output_dir, prefix+"_merged_{0}_min_{1}".format(dimred_method, min_length), excluding_contig_file_or_list=drop_contig_list, min_cluster_size=10)
+            # generate bins
+            _logger.info("generating bins for contigs >= {l} ...".format(l=min_length))
+            generate_bins(hdbscan_cluster_file, assembly, output_dir, bin_folder=prefix+"_merged_{0}_min_{1}".format(dimred_method, min_length))
+            # generate scaffold2bin files
+            _logger.info("generating scaffold2bin file for contigs >= {0} ...".format(min_length))
+            bin_folder = os.path.join(output_dir, prefix+"_merged_{0}_min_{1}".format(dimred_method, min_length))
+            scaffold2bin = bin_folder + "_scaffold2bin.tsv"
+            bin_folders.append(bin_folder)
+            scaffold2bin_files.append(scaffold2bin)
+            scaffolds_to_bins(bin_folder, scaffold2bin, suffix="fa")
+        
 
+    # run DAS_Tool
+    _logger.info("integrating using DAS_Tool ...")
+    proteins = codonfreq_file.replace("_norm.tsv", ".prot")
+    labels = [os.path.basename(os.path.normpath(bin_folder)) for bin_folder in bin_folders]
+    run_das_tool(bins=','.join(scaffold2bin_files), contigs=assembly, labels=','.join(labels),
+                 output_dir=output_dir, output_prefix=prefix+"_dastool", proteins=proteins,
+                 search_engine='usearch', write_bin_evals=1, create_plots=1, write_bins=1, threads=threads,
+                 score_threshold=0.4, duplicate_penalty=0.4, megabin_penalty=0.3)
 
 if __name__ == "__main__":
     sys.exit(main()) 

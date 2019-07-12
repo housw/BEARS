@@ -3,12 +3,15 @@
 
 import os
 import sys
+import copy
 import click
 import errno
 import logging
+import colorama
 import subprocess
 import numpy as np
 import pandas as pd
+from Bio import SeqIO
 from functools import wraps
 from sklearn import preprocessing
 import warnings
@@ -30,7 +33,7 @@ def add_options(options):
 def make_output_file(input_file, prefix=None, output_dir="./", force=False, suffix=".txt"):
     """make output_file, check existence"""
 
-    # input and output handeling
+    # input and output handling
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     if not prefix:
@@ -56,6 +59,34 @@ def make_output_file(input_file, prefix=None, output_dir="./", force=False, suff
     return out_file
 
 
+# credit:
+# http://uran198.github.io/en/python/2016/07/12/colorful-python-logging.html
+class ColorFormatter(logging.Formatter):
+
+    logcolor = {
+        logging.CRITICAL: colorama.Fore.BLUE,
+        logging.ERROR: colorama.Fore.RED,
+        logging.WARNING: colorama.Fore.YELLOW,
+        logging.INFO: colorama.Fore.GREEN,
+        logging.DEBUG: colorama.Fore.CYAN
+    }
+
+    def format(self, record, *args, **kwargs):
+        new_record = copy.copy(record)
+        if new_record.levelno in ColorFormatter.logcolor:
+            new_record.levelname = "{color_begin}{level}{color_end}".format(
+                level=new_record.levelname,
+                color_begin=ColorFormatter.logcolor[new_record.levelno],
+                color_end=colorama.Style.RESET_ALL,
+            )
+            #new_record.msg = "{color_begin}{msg}{color_end}".format(
+            #    msg=new_record.msg,
+            #    color_begin=ColorFormatter.logcolor[new_record.levelno],
+            #    color_end=colorama.Style.RESET_ALL,
+            #)
+        return super(ColorFormatter, self).format(new_record, *args, **kwargs)
+
+
 def setup_logging(loglevel):
     """Setup basic loggings
     Args:
@@ -70,9 +101,19 @@ def setup_logging(loglevel):
         'debug'   : logging.DEBUG,
     }.get(loglevel, logging.DEBUG)
 
-    logformat = "[%(asctime)s] [%(levelname)s] %(name)s:%(message)s"
+    # formats
+    logfmt = "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
+    datefmt = "%Y-%m-%d %H:%M:%S"
 
-    logging.basicConfig(level=loglevel, format=logformat, datefmt="%Y-%m-%d %H:%M:%S")
+    # logging everything to bears.log
+    logging.basicConfig(filename='bears.log', filemode='w', level=logging.DEBUG, format=logfmt, datefmt=datefmt)
+
+    # create a console logging handler and add it to the root logger
+    console = logging.StreamHandler()
+    formatter = ColorFormatter(logfmt, datefmt=datefmt)
+    console.setFormatter(formatter)
+    console.setLevel(loglevel)
+    logging.getLogger('').addHandler(console)
 
 
 def command_logger(func):
@@ -224,6 +265,10 @@ def normalizer(input_freq_file, output_dir, prefix, scale_func=np.cbrt):
 
 def combine_feature_tables(feature_file_list, output_dir, prefix, force=False):
 
+    # output file handling
+    if not folder_exists(output_dir):
+        create_directory(output_dir)
+
     output_file = os.path.join(output_dir, prefix + "_merged.tsv")
     #if os.path.exists(output_file):
     #    if not force:
@@ -245,3 +290,17 @@ def combine_feature_tables(feature_file_list, output_dir, prefix, force=False):
     combined_df.to_csv(output_file, sep="\t", header=True, index=True)
 
     return output_file
+
+
+
+def scaffolds_to_bins(input_bin_folder, output_file, suffix="fa"):
+    with open(output_file, "w") as oh:
+        for f in os.listdir(input_bin_folder):
+            if f.endswith(suffix):
+                bin_nr = f.strip("."+suffix)
+                with open(os.path.join(input_bin_folder, f), "r") as ih:
+                    for line in ih:
+                        if line.startswith(">"):
+                            scaffold = line[1:].split()[0].strip()
+                            oh.write(scaffold +"\t"+ bin_nr+"\n")
+

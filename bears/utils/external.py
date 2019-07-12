@@ -78,10 +78,26 @@ def run_bamcov(bam_file, depth_prefix, output_dir, min_read_len=30, min_MQ=0, mi
     return output_depth
 
 
+def run_das_tool(bins, contigs, labels, output_dir, output_prefix, proteins=None, search_engine='usearch',
+                 write_bin_evals=1, create_plots=1, write_bins=1, threads=1, db_directory=None,
+                 score_threshold=0.5, duplicate_penalty=0.6, megabin_penalty=0.5):
 
+    # output file handling
+    if not folder_exists(output_dir):
+        create_directory(output_dir)
+    outputbasename = os.path.join(output_dir, output_prefix)
 
-# TODO:
-def run_das_tool(*args, **kwargs):
-    pass
+    options={'bins':bins, 'contigs':contigs, 'outputbasename':outputbasename,
+             'labels':labels, 'search_engine':search_engine, 'write_bin_evals':write_bin_evals, 
+             'create_plots':create_plots, 'write_bins':write_bins, 'threads':threads,
+             'score_threshold':score_threshold, 'duplicate_penalty':duplicate_penalty, 'megabin_penalty':megabin_penalty}
+    if proteins:
+        options['proteins'] = proteins
+    if db_directory:
+        options['db_directory'] = db_directory
 
+    # run DAS_Tool
+    dastool = CommandWrapper(name="DAS_Tool", options=options) 
+    dastool.construct_command(option_prefix_char="--")
+    dastool.run()
 

@@ -10,6 +10,8 @@ import pandas as pd
 import hdbscan
 from Bio import SeqIO
 from collections.abc import Iterable
+import warnings
+warnings.filterwarnings(action='ignore', category=DeprecationWarning, module='sklearn')  # message="divide by zero encountered in divide")
 
 
 _logger = logging.getLogger("bears")
@@ -24,7 +26,7 @@ def hdbscan_clustering(input_tSNE_file, output_dir, prefix, excluding_contig_fil
     excluding_set = {}
     if isinstance(excluding_contig_file_or_list, Iterable):
         excluding_set = set(excluding_contig_file_or_list)
-    elif sinstance(excluding_contig_file_or_list, str) and os.path.isfile(excluding_contig_file_or_list):
+    elif isinstance(excluding_contig_file_or_list, str) and os.path.isfile(excluding_contig_file_or_list):
         try:
             contigs = pd.read_csv(excluding_contig_file_or_list, header=None)
             contigs.columns = ['Contig_ID']
@@ -45,7 +47,7 @@ def hdbscan_clustering(input_tSNE_file, output_dir, prefix, excluding_contig_fil
             _logger.error("excluding contigs failed: {e}".format(e=e))
 
     # hdbscan clustering
-    clusterer = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size)
+    clusterer = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size) #, allow_single_cluster=True)
     #clusterer = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size, prediction_data=True)
     #soft_membership_vec = hdbscan.all_points_membership_vectors(clusterer=clusterer)
     cluster_labels = clusterer.fit_predict(tSNE_df)

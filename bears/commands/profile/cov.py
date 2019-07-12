@@ -52,7 +52,7 @@ def calculate_contig_depth_from_bam_files(input_bam_file_list, output_dir, outpu
                 _logger.error("sample {0} has a different dimension, this sample is temporarily ignored, "
                               "please re-generate the bam and bamcov files if you want to include it".format(sample_id))
     _logger.info("concatenating coverage from all the samples ...")
-    depth_df = pd.concat(all_depth_dfs, axis=1)
+    depth_df = pd.concat(all_depth_dfs, axis=1, sort=True)
     depth_df.index.name="Contig_ID"
     depth_df.to_csv(output_depth_file, sep="\t", header=True, index=True)
 
@@ -80,17 +80,3 @@ def normalize_contig_depth(input_length_file, input_depth_file, output_dir, outp
     norm_depth_file = normalizer(prior_depth_file, output_dir, output_prefix, scale_func=scale_func)
 
     return norm_depth_file
-
-
-def compute_depth_tSNE_coordinates(input_depth_file, output_dir, output_prefix, threads=20):
-    """ tSNE dimension reduction using tSNE, return tSNE coordinates
-    """
-
-    # run t-SNE
-    df = pd.read_csv(input_depth_file, sep="\t", index_col=0, header=0)
-    arr = np.array(df)
-    tSNE_coordinates = TSNE(n_jobs=threads).fit_transform(arr)
-    tSNE_df = pd.DataFrame(data=tSNE_coordinates, index=df.index, columns=['Depth_tSNE_X', 'Depth_tSNE_Y'])
-    output_file = os.path.join(output_dir, output_prefix+".tsv")
-    tSNE_df.to_csv(output_file, sep="\t", header=True, index=True)
-
