@@ -7,12 +7,12 @@ import logging
 import pandas as pd
 from Bio import SeqIO
 import multiprocessing as mp
-from bears.utils.common import folder_exists
-from bears.utils.common import create_directory
-from bears.utils.common import CommandException
+from blendit.utils.common import folder_exists
+from blendit.utils.common import create_directory
+from blendit.utils.common import CommandException
 
 
-_logger = logging.getLogger("bears")
+_logger = logging.getLogger("blendit")
 
 
 def get_kmer_count_per_contig(contig, ksize=5):

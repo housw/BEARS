@@ -1,3 +1,0 @@
-[console_scripts]
-bears = bears.cli:main
-

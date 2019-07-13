@@ -4,12 +4,12 @@ import os
 import logging
 from Bio import SeqIO
 from freqgen import k_mer_frequencies, codon_frequencies, genetic_codes
-from bears.utils.common import folder_exists
-from bears.utils.common import create_directory
-from bears.utils.common import CommandException
+from blendit.utils.common import folder_exists
+from blendit.utils.common import create_directory
+from blendit.utils.common import CommandException
 
 
-_logger = logging.getLogger("bears")
+_logger = logging.getLogger("blendit")
 
 
 def get_codon_frequency_per_contig(contig2seqs):

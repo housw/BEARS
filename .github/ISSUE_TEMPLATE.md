@@ -1,4 +1,4 @@
-* BEARS version:
+* Blendit version:
 * Python version:
 * Operating System:
 

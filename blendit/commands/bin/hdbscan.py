@@ -14,7 +14,7 @@ import warnings
 warnings.filterwarnings(action='ignore', category=DeprecationWarning, module='sklearn')  # message="divide by zero encountered in divide")
 
 
-_logger = logging.getLogger("bears")
+_logger = logging.getLogger("blendit")
 
 
 def hdbscan_clustering(input_tSNE_file, output_dir, prefix, excluding_contig_file_or_list=None, min_cluster_size=10):

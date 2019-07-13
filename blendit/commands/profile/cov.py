@@ -5,11 +5,11 @@ import logging
 import numpy as np
 import pandas as pd
 from MulticoreTSNE import MulticoreTSNE as TSNE
-from bears.utils.external import run_bamcov
-from bears.utils.common import normalizer
+from blendit.utils.external import run_bamcov
+from blendit.utils.common import normalizer
 
 
-_logger = logging.getLogger("bears")
+_logger = logging.getLogger("blendit")
 
 
 def calculate_contig_depth_from_bam_files(input_bam_file_list, output_dir, output_prefix,

@@ -19,7 +19,7 @@ warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
 warnings.filterwarnings(action='ignore', category=DeprecationWarning, module='sklearn')  # message="divide by zero encountered in divide")
 
 
-_logger = logging.getLogger("bears")
+_logger = logging.getLogger("blendit")
 
 
 def compute_PCA_components(df, n_components=100):
@@ -45,7 +45,7 @@ def compute_tSNE_coordinates(df, threads=20, n_components=3):
     """
 
     # MulticoreTSNE
-    _logger.info("tranforming with tSNE ...")
+    _logger.info("embedding with tSNE ...")
     arr = np.array(df)
     tSNE_coordinates = multiTSNE(n_jobs=threads, n_components=n_components, random_state=1).fit_transform(arr)
     tSNE_df = pd.DataFrame(data=tSNE_coordinates, index=df.index,
@@ -75,7 +75,7 @@ def compute_UMAP_coordinates(df, n_components=3, random_state=42):
     :return: pandas dataframe after UMAP
     """
 
-    _logger.info("tranforming with UMAP ...")
+    _logger.info("embedding with UMAP ...")
     arr = np.array(df)
     reducer = umap.UMAP(random_state=random_state, n_components=n_components)
     umap_coordinates = reducer.fit_transform(arr)

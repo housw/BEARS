@@ -25,7 +25,7 @@ from .utils.common import scaffolds_to_bins
 from .utils.external import run_das_tool
 
 
-_logger = logging.getLogger("bears")
+_logger = logging.getLogger("blendit")
 
 
 def emit_subcommand_info(subcommand, loglevel):
@@ -36,22 +36,22 @@ def emit_subcommand_info(subcommand, loglevel):
 # entry point
 @click.group()
 def main(*args, **kwargs):
-    """BEARS: Binning mEtagenomic contigs via iterAtive hieRarchical dbScan. 
+    """Blendit: Binning metagenomic contigs via length-dependent iterative clustering and integration
 
     The program implements the `profile` and `bin` steps of 
     metagenomic data analysis. You can invoke each step using the 
     following subcommands: 
 
     \b
-    -> bears profile COMMAND [ARGS] ...
+    -> blendit profile COMMAND [ARGS] ...
     \b
-      -> bears profile codon:  run codon usage profiling
-      -> bears profile cov:    run read coverage profiling
-      -> bears profile kmer:   run k-mer frequency profiling
+      -> blendit profile codon:  run codon usage profiling
+      -> blendit profile cov:    run read coverage profiling
+      -> blendit profile kmer:   run k-mer frequency profiling
  
     \b
-    -> bears bin COMMAND [ARGS] ...
-      -> bears bin hdbscan:    run hdbscan binning
+    -> blendit bin COMMAND [ARGS] ...
+      -> blendit bin hdbscan:    run hdbscan binning
 
     """
     pass
@@ -74,11 +74,11 @@ def bin(ctx, *args, **kwargs):
 # global shared options
 shared_options = [
     click.option('-p', '--prefix', help="output prefix", default="assembly", type=str, show_default=True),
-    click.option('-o', '--output_dir', help="output directory", default="./bears_results", show_default=True),
+    click.option('-o', '--output_dir', help="output directory", default="./blendit_results", show_default=True),
     click.option('-f', '--force', is_flag=True, default=False, help="force to overwrite the output file"), 
     click.option('-l', '--loglevel', default='debug', show_default=True,
         type=click.Choice(['critical', 'error', 'warning', 'info', 'debug'])),
-    click.version_option(version="0.1.0", prog_name="bears", message="%(prog)s, version %(version)s")
+    click.version_option(version="0.1.0", prog_name="blendit", message="%(prog)s, version %(version)s")
 ]
 
 
@@ -191,7 +191,7 @@ def hdbscan(kmerfreq_file, codonfreq_file, depth_file, contig_length_file, assem
     # merge kmer, codon and depth profiles
     _logger.info("combining kmer, codon and coverage profiles ...")
     merged_profile = combine_feature_tables([kmerfreq_file, codonfreq_file, depth_file], output_dir=output_dir, prefix=prefix, force=force)
-    merged_profile = os.path.join(output_dir, prefix+"_merged.tsv")
+    #merged_profile = os.path.join(output_dir, prefix+"_merged.tsv")
 
     feature_files = []
     if dimred in ('tsne', 'both'):

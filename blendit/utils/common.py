@@ -18,7 +18,7 @@ import warnings
 warnings.filterwarnings(action="ignore", category=DeprecationWarning, module='sklearn')  # message="divide by zero encountered in divide")
 
 
-_logger = logging.getLogger("bears")
+_logger = logging.getLogger("blendit")
 
 
 # credit: https://github.com/pallets/click/issues/108
@@ -105,8 +105,8 @@ def setup_logging(loglevel):
     logfmt = "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
     datefmt = "%Y-%m-%d %H:%M:%S"
 
-    # logging everything to bears.log
-    logging.basicConfig(filename='bears.log', filemode='w', level=logging.DEBUG, format=logfmt, datefmt=datefmt)
+    # logging everything to blendit.log
+    logging.basicConfig(filename='blendit.log', filemode='w', level=logging.DEBUG, format=logfmt, datefmt=datefmt)
 
     # create a console logging handler and add it to the root logger
     console = logging.StreamHandler()
