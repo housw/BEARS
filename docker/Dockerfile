@@ -8,7 +8,7 @@ ENV DEBIAN_FRONTEND noninteractive
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 RUN apt-get -qq update && \
     apt-get install -y --no-install-recommends cmake python python-dev python-pip python-wheel python-setuptools \
-    libcurl3-dev prodigal mummer wget && \
+    libcurl3-dev prodigal mummer wget libhdf5-dev && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 
@@ -19,6 +19,9 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86
     /opt/conda/bin/conda clean -tipsy && \
     ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh
 ENV PATH=/opt/conda/bin:$PATH
+
+RUN conda install -c bioconda -y cython && \
+    conda clean -ya
 
 
 
