@@ -12,7 +12,7 @@ from blendit.utils.common import create_directory
 from blendit.utils.common import CommandException
 
 
-_logger = logging.getLogger("blendit")
+_logger = logging.getLogger("BlendIt")
 
 
 def get_kmer_count_per_contig(contig, ksize=5):

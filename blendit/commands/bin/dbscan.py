@@ -12,7 +12,7 @@ from Bio import SeqIO
 from collections.abc import Iterable
 
 
-_logger = logging.getLogger("blendit")
+_logger = logging.getLogger("BlendIt")
 
 
 # https://towardsdatascience.com/dbscan-clustering-for-data-shapes-k-means-cant-handle-well-in-python-6be89af4e6ea

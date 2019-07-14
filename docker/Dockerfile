@@ -41,15 +41,11 @@ RUN git clone --recurse-submodules https://github.com/fbreitwieser/bamcov && \
     cd bamcov && make && make test && cd /
 ENV PATH=/bamcov:$PATH
 
-# python packages
-RUN conda install -c bioconda -y cython && \
-    conda clean -ya
-
 # blendit
 ENV BlendIt_DIR /BlendIt
 WORKDIR /
 RUN git clone https://github.com/housw/BlendIt.git && \
-    cd ${BlendIt_DIR} && /opt/conda/bin/python setup.py install
+    cd ${BlendIt_DIR} && pip install -r requirements_dev.txt && python setup.py install
 
 
 # Entry

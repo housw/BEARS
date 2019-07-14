@@ -13,51 +13,22 @@ with open('HISTORY.rst') as history_file:
 
 requirements = ['click>=6.0,<=6.7',
                 'click-default-group>=1.2.1',
-                'numpy>=1.16.4',
                 'pandas>=0.24.0',
-                'scikit-learn>=0.21.2',
                 'scipy>=1.3.0',
-                'colorama>=0.4.1',
+                'scikit-learn>=0.21.2',
                 'biopython>=1.68',
-                'bokeh>=1.2.0',
-                'Jinja2>=2.10.1',
-                'MarkupSafe>=1.1.1',
-                'packaging>=19.0',
-                'pyparsing>=2.4.0',
-                'Pillow>=6.1.0',
-                'python-dateutil>=2.8.0',
-                'PyYAML>=5.1.1',
-                'tornado>=6.0.3',
-                'dit>=1.2.3',
-                'boltons>=19.1.0',
-                'bz2file>=0.98',
-                'cffi>=1.12.3',
-                'contextlib2>=0.5.5',
-                'Cython>=0.29.12',
-                'debtcollector>=1.21.0',
-                'decorator>=4.4.0',
-                'h5py>=2.9.0',
-                'joblib>=0.13.2',
-                'llvmlite>=0.29.0',
-                'networkx>=2.3',
-                'numba>=0.44.1',
-                'pbr>=5.4.0',
-                'prettytable>=0.7.2',
-                'pycparser>=2.19',
+                'colorama>=0.4.1',
                 'pymer>=0.3.3',
-                'pytz>=2019.1',
-                'screed>=1.0',
-                'six>=1.12.0',
                 'umap-learn>=0.3.9',
-                'wrapt>=1.11.2',
                 'hdbscan>=0.8.22',
-                'pymer>=0.3.0',
                 'freqgen>=0.1.0',
                 'MulticoreTSNE>=0.1'
                 ]
 
-
-setup_requirements = ['pytest-runner', ]
+setup_requirements = ['pytest-runner',
+                      'cython>=0.29.12',
+                      'numpy>=1.16.4'
+                      ]
 
 test_requirements = ['pytest', ]
 

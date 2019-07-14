@@ -25,7 +25,7 @@ from .utils.common import scaffolds_to_bins
 from .utils.external import run_das_tool
 
 
-_logger = logging.getLogger("blendit")
+_logger = logging.getLogger("BlendIt")
 
 
 def emit_subcommand_info(subcommand, loglevel):

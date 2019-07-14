@@ -9,7 +9,7 @@ from blendit.utils.external import run_bamcov
 from blendit.utils.common import normalizer
 
 
-_logger = logging.getLogger("blendit")
+_logger = logging.getLogger("BlendIt")
 
 
 def calculate_contig_depth_from_bam_files(input_bam_file_list, output_dir, output_prefix,

@@ -9,7 +9,7 @@ from blendit.utils.common import create_directory
 from blendit.utils.common import CommandException
 
 
-_logger = logging.getLogger("blendit")
+_logger = logging.getLogger("BlendIt")
 
 
 def get_codon_frequency_per_contig(contig2seqs):
