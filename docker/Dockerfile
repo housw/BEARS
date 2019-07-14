@@ -42,7 +42,7 @@ RUN git clone --recurse-submodules https://github.com/fbreitwieser/bamcov && \
 ENV PATH=/bamcov:$PATH
 
 # python packages
-RUN conda install -c bioconda -y cython numpy pandas scipy scikit-learn biopython && \
+RUN conda install -c bioconda -y cython && \
     conda clean -ya
 
 # blendit

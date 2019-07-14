@@ -95,3 +95,4 @@ setup(
     version='0.1.0',
     zip_safe=False,
 )
+
