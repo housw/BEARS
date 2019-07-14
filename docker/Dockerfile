@@ -1,61 +1,46 @@
-FROM shengwei/drep:latest
+FROM shengwei/das_tool:latest
 MAINTAINER Shengwei Hou, housw2010@gmail.com
+
 
 # update
 RUN chown root:root /tmp && chmod 1777 /tmp
 ENV DEBIAN_FRONTEND noninteractive
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 RUN apt-get -qq update && \
-    apt-get install -y automake autoconf autopoint bison \
-    gettext gperf texinfo rsync coreutils libpcre3 libpcre3-dev zlib1g-dev wget liburi-escape-xs-perl \
-    littler ruby cpanminus ncbi-blast+ hmmer prodigal mummer git && \
+    apt-get install -y --no-install-recommends cmake python python-dev python-pip python-wheel python-setuptools \
+    libcurl3-dev prodigal mummer wget && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 
-# -------- #
-# DAS_Tool #
-# -------- #
+# install miniconda and python 3.6
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
+    /bin/bash ~/miniconda.sh -b -p /opt/conda && rm ~/miniconda.sh && \
+    /opt/conda/bin/conda install conda-build python=3.6 && \
+    /opt/conda/bin/conda clean -tipsy && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh
+ENV PATH=/opt/conda/bin:$PATH
 
-# variables
-ENV DAS_TOOL_DIR /DAS_Tool
-ENV VERSION 1.1.1
-RUN mkdir $DAS_TOOL_DIR
-WORKDIR $DAS_TOOL_DIR
 
-# install R packages
-ADD install_dependences.R $DAS_TOOL_DIR
-RUN Rscript install_dependences.R && rm install_dependences.R
 
-# install from github
-RUN wget https://github.com/cmks/DAS_Tool/archive/${VERSION}.tar.gz && \
-    tar zxfv ${VERSION}.tar.gz && rm ${VERSION}.tar.gz && \
-    ln -s DAS_Tool-${VERSION} current && chmod +x current/DAS_Tool
-WORKDIR $DAS_TOOL_DIR/current
-RUN mkdir db && mv db.zip db && unzip db/db.zip -d db && rm db/db.zip
-RUN R CMD INSTALL ./package/DASTool_${VERSION}.tar.gz
 
-# install pullseq
-RUN wget https://github.com/bcthomas/pullseq/archive/master.zip && unzip master.zip && \
-    cd pullseq-master && autoreconf -i && ./configure && make && make install && \
-    cd $DAS_TOOL_DIR/current && rm -rf pullseq-master && rm master.zip
+# ---- #
+# dRep #
+# ---- #
 
-# install prodigal
-RUN wget https://github.com/hyattpd/Prodigal/archive/v2.6.3.tar.gz && \
-    tar zxfv v2.6.3.tar.gz && cd Prodigal-2.6.3 && make && make install && \
-    cd $DAS_TOOL_DIR/current && rm -rf Prodigal-2.6.3 && rm v2.6.3.tar.gz
 
-# install diamond
-RUN wget http://github.com/bbuchfink/diamond/releases/download/v0.9.22/diamond-linux64.tar.gz && \
-    tar zxfv diamond-linux64.tar.gz && rm diamond-linux64.tar.gz && mv diamond /usr/local/bin/
-
-# add to PATH
-ENV PATH="$PATH":$DAS_TOOL_DIR/current
-ADD usearch /usr/local/bin/
 
 
 # ------- #
 # BlendIt #
 # ------- #
 
+# bamcov
+WORKDIR /
+RUN git clone --recurse-submodules https://github.com/fbreitwieser/bamcov && \
+    cd bamcov && make && make test && cd /
+ENV PATH=/bamcov:$PATH
+
+# blendit
 ENV BlendIt_DIR /BlendIt
 WORKDIR /
 RUN git clone https://github.com/housw/BlendIt.git && \
