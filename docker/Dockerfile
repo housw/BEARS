@@ -20,8 +20,6 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86
     ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh
 ENV PATH=/opt/conda/bin:$PATH
 
-RUN conda install -c bioconda -y cython && \
-    conda clean -ya
 
 
 
@@ -42,6 +40,10 @@ WORKDIR /
 RUN git clone --recurse-submodules https://github.com/fbreitwieser/bamcov && \
     cd bamcov && make && make test && cd /
 ENV PATH=/bamcov:$PATH
+
+# python packages
+RUN conda install -c bioconda -y cython numpy pandas scipy scikit-learn biopython && \
+    conda clean -ya
 
 # blendit
 ENV BlendIt_DIR /BlendIt
