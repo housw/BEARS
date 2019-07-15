@@ -20,6 +20,37 @@ BlendIt
 * Documentation: https://blendit.readthedocs.io.
 
 
+
+Installation
+------------
+
+:install from github:
+
+First, follow the instructions to install `DAS_Tool <https://github.com/cmks/DAS_Tool>`_, then install `BlendIt`
+from github:
+
+::
+
+    $ git clone https://github.com/housw/BlendIt.git && \
+      cd BlendIt && pip install -r requirements_dev.txt && python setup.py install
+
+:install using docker:
+
+::
+
+    $ git clone https://github.com/housw/BlendIt.git && \
+      cd BlendIt/docker && \
+      docker build -t 'blendit:0.1.0' .
+
+:install using singularity:
+
+::
+
+    $ git clone https://github.com/housw/BlendIt.git && \
+      cd BlendIt/singularity && \
+      sudo singularity build --notest BlendIt.sif Singularity.BlendIt.def
+
+
 Usage
 -----
 
