@@ -1,3 +1,8 @@
+
+**WARNING**: This software is still under active development, please wait until the first release.
+
+
+
 =======
 BlendIt
 =======
@@ -76,13 +81,16 @@ Usage
     -> blendit bin COMMAND [ARGS] ...
         -> blendit bin hdbscan:    run hdbscan binning
 
+    -> blendit pipe COMMAND [ARGS] ...
+        -> blendit pipe ph:        run all feature profilings and hdbscan clustering
+
     Options:
         --help  Show this message and exit.
 
     Commands:
         bin
+        pipe
         profile
-
 
 
 :profile subcommands:
@@ -173,6 +181,66 @@ Usage
         --version                       Show the version and exit.
         --help                          Show this message and exit.
 
+- ``blendit bin dbscan``
+
+::
+
+    $ blendit bin dbscan --help
+
+    Usage: blendit bin dbscan [OPTIONS] KMERFREQ_FILE CODONFREQ_FILE DEPTH_FILE CONTIG_LENGTH_FILE ASSEMBLY
+
+    dbscan binning
+
+    Options:
+        -x, --min_length_x INTEGER      minimum contig length threshold x  [default: 2000]
+        -y, --min_length_y INTEGER      minimum contig length threshold y  [default: 10000]
+        -s, --length_step INTEGER       minimum contig length increasement step [default: 1000]
+        -t, --threads INTEGER           maximum number of threads to use when available  [default: 20]
+        -d, --dimred [tsne|umap|both]   dimension reduction methods, can be 'tsne', 'umap' or 'both'  [default: both]
+        --dimensions INTEGER            number of dimensions to keep for embedding [default: 3]
+        --components INTEGER            maximum PCA components to keep  [default:100]
+        -p, --prefix TEXT               output prefix  [default: assembly]
+        -o, --output_dir TEXT           output directory  [default:./blendit_results]
+        -f, --force                     force to overwrite the output file
+        -l, --loglevel [critical|error|warning|info|debug] [default: debug]
+        --version                       Show the version and exit.
+        --help                          Show this message and exit.
+
+
+:pipe subcommands:
+
+- ``blendit pipe ph``
+
+::
+
+
+    $ blendit pipe ph --help
+
+    Usage: blendit pipe ph [OPTIONS] ASSEMBLY [BAM_FILES]...
+
+    run feature profiling and hdbscan clustering pipeline
+
+    Options:
+        -k, --kmer_size [4|5]           k-mer size  [default: 5]
+        --kmerfreq_scale_func [none|sqrt|cbrt|log10] k-mer freq scale function  [default: cbrt]
+        --codonfreq_scale_func [none|sqrt|cbrt|log10] codon freq scale function  [default: cbrt]
+        --cov_scale_func [none|sqrt|cbrt|log10] coverage scale function  [default: log10]
+        -x, --min_length_x INTEGER      minimum contig length threshold x  [default: 2000]
+        -y, --min_length_y INTEGER      minimum contig length threshold y  [default: 10000]
+        -s, --length_step INTEGER       minimum contig length increasement step [default: 1000]
+        -t, --threads INTEGER           maximum number of threads to use when available  [default: 20]
+        -d, --dimred [tsne|umap|both]   dimension reduction methods, can be 'tsne', 'umap' or 'both'  [default: both]
+        --dimensions INTEGER            number of dimensions to keep for embedding [default: 3]
+        --components INTEGER            maximum PCA components to keep  [default: 100]
+        -l, --read_length INTEGER       read length for log-scaled transformation [default: 250]
+        -p, --prefix TEXT               output prefix  [default: assembly]
+        -o, --output_dir TEXT           output directory  [default: ./blendit_results]
+        -f, --force                     force to overwrite the output file
+        -l, --loglevel [critical|error|warning|info|debug] [default: debug]
+        -t, --threads INTEGER           maximum number of threads/cpus to use when available  [default: 20]
+        --version                       Show the version and exit.
+        --help                          Show this message and exit.
+
 
 Example
 -------
@@ -182,6 +250,11 @@ Example
 
 TODO
 ----
+
+:bin subcommands:
+
+- ``blendit bin dbscan``
+
 
 :post subcommands:
 
@@ -197,8 +270,4 @@ TODO
 
 :pipe subcommands:
 
-- ``blendit pipe tuh``
-
-- ``blendit pipe th``
-
-- ``blendit pipe ud``
+- ``blendit pipe pd``
