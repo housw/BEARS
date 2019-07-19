@@ -10,7 +10,7 @@ from .common import folder_exists
 from .common import create_directory
 
 
-_logger = logging.getLogger("blendit")
+_logger = logging.getLogger("BlendIt")
 
 
 def run_prodigal(assembly, prefix, output_dir, output_fmt='gbk', flags = ['m'], force=False):

@@ -76,8 +76,9 @@ def get_codon_frequencies_for_contigs(input_prodigal_nucl_file, output_dir, pref
         for contig, frequency_dict in contig2frequencies.items():
             line = [contig]
             for codon in genetic_codes[genetic_code]:
-                frequency = frequency_dict.get(codon, 0)
-                line.append(str(frequency))
+                _frequency = frequency_dict.get(codon, 0)
+                frequency = "{:.6f}".format(_frequency)
+                line.append(frequency)
             oh.write("\t".join(line)+"\n")
 
     return output_codon_freq

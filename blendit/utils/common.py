@@ -18,7 +18,7 @@ import warnings
 warnings.filterwarnings(action="ignore", category=DeprecationWarning, module='sklearn')  # message="divide by zero encountered in divide")
 
 
-_logger = logging.getLogger("blendit")
+_logger = logging.getLogger("BlendIt")
 
 
 # credit: https://github.com/pallets/click/issues/108
@@ -87,19 +87,16 @@ class ColorFormatter(logging.Formatter):
         return super(ColorFormatter, self).format(new_record, *args, **kwargs)
 
 
-def setup_logging(loglevel):
+def setup_logging(loglevel='debug'):
     """Setup basic loggings
-    Args:
-      loglevel (str): minimum loglevel for emitting messages
     """
 
     loglevel = {
         'critical': logging.CRITICAL,
-        'error'   : logging.ERROR,
-        'warning' : logging.WARNING,
-        'info'    : logging.INFO,
-        'debug'   : logging.DEBUG,
-    }.get(loglevel, logging.DEBUG)
+        'error': logging.ERROR,
+        'warning': logging.WARNING,
+        'info': logging.INFO,
+        'debug': logging.DEBUG}.get(loglevel, logging.DEBUG)
 
     # formats
     logfmt = "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"
@@ -114,6 +111,21 @@ def setup_logging(loglevel):
     console.setFormatter(formatter)
     console.setLevel(loglevel)
     logging.getLogger('').addHandler(console)
+
+
+def set_loglevel(loglevel):
+    """
+    :param loglevel: loglevel (str): minimum loglevel for emitting messages
+    :return:
+    """
+    _level = {
+        'critical': logging.CRITICAL,
+        'error': logging.ERROR,
+        'warning': logging.WARNING,
+        'info': logging.INFO,
+        'debug': logging.DEBUG}.get(loglevel, logging.DEBUG)
+
+    logging.getLogger('').setLevel(_level)
 
 
 def command_logger(func):
@@ -240,22 +252,38 @@ def get_prefix(input_file):
     return prefix
 
 
-def normalizer(input_freq_file, output_dir, prefix, scale_func=np.cbrt):
+def normalizer(input_freq_file, output_dir, prefix, scale_func='none', norm='l2', spike=1e-10):
     """ 1) scale the data with numpy function
         2) normalize the data using Normalizer
     """
 
     output_norm_freq_file = os.path.join(output_dir, prefix+"_norm.tsv")
 
-
     freq_df = pd.read_csv(input_freq_file, sep="\t", index_col=0, header=0)
     freq_df.sort_index(inplace=True)
+    freq_df.fillna(freq_df.mean(), inplace=True)
 
-    # re-scale the freq df
-    transform_freq_df = freq_df.apply(func=scale_func)
 
-    # scale each value using sklearn.preprocessing.Normalizer()
-    scaler = preprocessing.Normalizer()
+    # rescale freqency table by scale_func
+    scale_func_dict = {'none':None, 'sqrt':np.sqrt, 'cbrt':np.cbrt, 'log10':np.log10}
+    if scale_func in scale_func_dict:
+        scale_func = scale_func_dict[scale_func]
+    else:
+        scale_func = None
+        warn_msg = "scale_func has to be one of ['none', 'sqrt', 'cbrt', 'log10'], not {0}, " \
+                   "here 'none' will be used".format(scale_func)
+        _logger.warn(warn_msg)
+    if scale_func:
+        # add a small number to each cell
+        if scale_func == np.log10:
+            freq_df += spike
+        transform_freq_df = freq_df.apply(func=scale_func)
+    else:
+        transform_freq_df = freq_df
+
+    # unit normalization each value using sklearn.preprocessing.Normalizer()
+    norm = norm if norm in ['l1', 'l2' 'max'] else 'l2'
+    scaler = preprocessing.Normalizer(norm=norm)
     scaled_freq_df = scaler.fit_transform(transform_freq_df)
     scaled_freq_df = pd.DataFrame(scaled_freq_df, columns=transform_freq_df.columns, index=transform_freq_df.index)
     scaled_freq_df.to_csv(output_norm_freq_file, sep="\t", header=True, index=True, float_format='%.6f')
@@ -291,16 +319,4 @@ def combine_feature_tables(feature_file_list, output_dir, prefix, force=False):
 
     return output_file
 
-
-
-def scaffolds_to_bins(input_bin_folder, output_file, suffix="fa"):
-    with open(output_file, "w") as oh:
-        for f in os.listdir(input_bin_folder):
-            if f.endswith(suffix):
-                bin_nr = f.strip("."+suffix)
-                with open(os.path.join(input_bin_folder, f), "r") as ih:
-                    for line in ih:
-                        if line.startswith(">"):
-                            scaffold = line[1:].split()[0].strip()
-                            oh.write(scaffold +"\t"+ bin_nr+"\n")
 

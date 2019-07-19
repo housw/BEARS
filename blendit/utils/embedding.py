@@ -19,7 +19,7 @@ warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
 warnings.filterwarnings(action='ignore', category=DeprecationWarning, module='sklearn')  # message="divide by zero encountered in divide")
 
 
-_logger = logging.getLogger("blendit")
+_logger = logging.getLogger("BlendIt")
 
 
 def compute_PCA_components(df, n_components=100):
@@ -40,15 +40,15 @@ def compute_PCA_components(df, n_components=100):
     return pca_df
 
 
-def compute_tSNE_coordinates(df, threads=20, n_components=3):
-    """ tSNE dimension reduction using tSNE, return tSNE coordinates
+def compute_tSNE_embeddings(df, threads=20, n_components=3):
+    """ tSNE dimension reduction using tSNE, return tSNE embeddings
     """
 
     # MulticoreTSNE
     _logger.info("embedding with tSNE ...")
     arr = np.array(df)
-    tSNE_coordinates = multiTSNE(n_jobs=threads, n_components=n_components, random_state=1).fit_transform(arr)
-    tSNE_df = pd.DataFrame(data=tSNE_coordinates, index=df.index,
+    tSNE_embeddings = multiTSNE(n_jobs=threads, n_components=n_components, random_state=1).fit_transform(arr)
+    tSNE_df = pd.DataFrame(data=tSNE_embeddings, index=df.index,
                            columns=['tSNE_{i}'.format(i=n) for n in range(n_components)])
     '''
     # openTSNE
@@ -68,7 +68,7 @@ def compute_tSNE_coordinates(df, threads=20, n_components=3):
     return tSNE_df
 
 
-def compute_UMAP_coordinates(df, n_components=3, random_state=42):
+def compute_UMAP_embeddings(df, n_components=3, random_state=42):
     """
     :param df: input pandas dataframe
     :param n_components: number of components to keep after UMAP dimension reduction
@@ -78,14 +78,14 @@ def compute_UMAP_coordinates(df, n_components=3, random_state=42):
     _logger.info("embedding with UMAP ...")
     arr = np.array(df)
     reducer = umap.UMAP(random_state=random_state, n_components=n_components)
-    umap_coordinates = reducer.fit_transform(arr)
-    umap_df = pd.DataFrame(data=umap_coordinates, index=df.index, columns=['UMAP_{i}'.format(i=n) for n in range(n_components)])
+    umap_embeddings = reducer.fit_transform(arr)
+    umap_df = pd.DataFrame(data=umap_embeddings, index=df.index, columns=['UMAP_{i}'.format(i=n) for n in range(n_components)])
 
     return umap_df
 
 
-def compute_PCA_tSNE_coordinates(input_feature_table, output_dir, prefix, threads=20, n_components=10, pca_components=100):
-    """ dimension reduction using tSNE, return tSNE coordinates
+def compute_PCA_tSNE_embeddings(input_feature_table, output_dir, prefix, threads=20, n_components=10, pca_components=100):
+    """ dimension reduction using tSNE, return tSNE embeddings
     """
     output_file = os.path.join(output_dir, prefix + ".tsne")
 
@@ -97,14 +97,14 @@ def compute_PCA_tSNE_coordinates(input_feature_table, output_dir, prefix, thread
     pca_df = compute_PCA_components(df, n_components=pca_components)
 
     # run t-SNE
-    tSNE_df = compute_tSNE_coordinates(pca_df, threads=threads, n_components=n_components)
+    tSNE_df = compute_tSNE_embeddings(pca_df, threads=threads, n_components=n_components)
     tSNE_df.to_csv(output_file, sep="\t", header=True, index=True, float_format='%.6f')
 
     return output_file
 
 
-def compute_PCA_UMAP_coordinates(input_feature_table, output_dir, prefix, n_components=10, pca_components=100):
-    """ dimension reduction using UMAP, return UMAP coordinates
+def compute_PCA_UMAP_embeddings(input_feature_table, output_dir, prefix, n_components=10, pca_components=100):
+    """ dimension reduction using UMAP, return UMAP embeddings
     """
 
     output_file = os.path.join(output_dir, prefix + ".umap")
@@ -117,7 +117,27 @@ def compute_PCA_UMAP_coordinates(input_feature_table, output_dir, prefix, n_comp
     pca_df = compute_PCA_components(df, n_components=pca_components)
 
     # run UMAP
-    umap_df = compute_UMAP_coordinates(pca_df, n_components=n_components)
+    umap_df = compute_UMAP_embeddings(pca_df, n_components=n_components)
     umap_df.to_csv(output_file, sep="\t", header=True, index=True, float_format='%.6f')
 
     return output_file
+
+
+def compute_embeddings(merged_profile, output_dir, prefix, threads, n_components, pca_components, dimred=['tsne', 'umap', 'both']):
+    """ a wrap function to compute tsne, umap or both  embeddings
+    """
+    embeddings = []
+    if dimred in ('tsne', 'both'):
+        # run t-SNE
+        _logger.info("computing t-SNE embeddings after PCA ...")
+        tsne_file = compute_PCA_tSNE_embeddings(merged_profile, output_dir, prefix+"_merged_{}d".format(n_components), threads=threads, n_components=n_components, pca_components=pca_components)
+        #tsne_file =  os.path.join(output_dir, prefix+"_merged_{}d.tsne".format(dimensions))
+        embeddings.append(tsne_file)
+    if dimred in ('umap', 'both'):
+        # run UMAP
+        _logger.info("computing UMAP embeddings after PCA ...")
+        umap_file = compute_PCA_UMAP_embeddings(merged_profile, output_dir, prefix+"_merged_{}d".format(n_components), n_components=n_components, pca_components=pca_components)
+        #umap_file = os.path.join(output_dir, prefix + "_merged_{}d.umap".format(dimensions))
+        embeddings.append(umap_file)
+    
+    return embeddings

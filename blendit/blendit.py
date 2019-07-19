@@ -12,25 +12,40 @@ from .utils import setup_logging
 from .utils import run_prodigal
 from .utils import get_prefix
 from .commands.profile import get_codon_frequencies_for_contigs
-from .commands.profile import get_kmer_counts_for_contigs
-from .commands.profile import calculate_contig_depth_from_bam_files
+from .commands.profile import get_kmer_frequencies_for_contigs
+from .commands.profile import parallel_calculate_contig_depth_from_bam_files
 from .commands.profile import normalize_contig_depth
-from .commands.bin import hdbscan_clustering
-from .commands.bin import generate_bins
+from .commands.bin import iterative_hdbscan_binning
+from .commands.bin import iterative_dbscan_clustering
+from .commands.bin import iterative_optics_binning
 from .utils.common import normalizer
 from .utils.common import combine_feature_tables
-from .utils.coordinate import compute_PCA_tSNE_coordinates
-from .utils.coordinate import compute_PCA_UMAP_coordinates
-from .utils.common import scaffolds_to_bins
+from .utils.embedding import compute_embeddings
+#from .utils.common import scaffolds_to_bins
 from .utils.external import run_das_tool
+from .utils.common import set_loglevel
 
 
+# logger
 _logger = logging.getLogger("BlendIt")
+setup_logging()
 
 
 def emit_subcommand_info(subcommand, loglevel):
-    setup_logging(loglevel)
+    set_loglevel(loglevel)
     _logger.info('invoking {0} subcommand ...'.format(subcommand))
+
+
+# global shared options
+shared_options = [
+    click.option('-p', '--prefix', help="output prefix", default="assembly", type=str, show_default=True),
+    click.option('-o', '--output_dir', help="output directory", default="./blendit_results", show_default=True),
+    click.option('-f', '--force', is_flag=True, default=False, help="force to overwrite the output file"),
+    click.option('-l', '--loglevel', default='debug', show_default=True,
+        type=click.Choice(['critical', 'error', 'warning', 'info', 'debug'])),
+    click.option('-t', '--threads', type=int, default=20, show_default=True,
+        help="maximum number of threads/cpus to use when available"),
+    click.version_option(version="0.1.0", prog_name="blendit", message="%(prog)s, version %(version)s")]
 
 
 # entry point
@@ -53,6 +68,10 @@ def main(*args, **kwargs):
     -> blendit bin COMMAND [ARGS] ...
       -> blendit bin hdbscan:    run hdbscan binning
 
+    \b
+    -> blendit pipe COMMAND [ARGS] ...
+      -> blendit pipe ph:        run all feature profilings and hdbscan clustering
+
     """
     pass
 
@@ -71,46 +90,47 @@ def bin(ctx, *args, **kwargs):
     pass
 
 
-# global shared options
-shared_options = [
-    click.option('-p', '--prefix', help="output prefix", default="assembly", type=str, show_default=True),
-    click.option('-o', '--output_dir', help="output directory", default="./blendit_results", show_default=True),
-    click.option('-f', '--force', is_flag=True, default=False, help="force to overwrite the output file"), 
-    click.option('-l', '--loglevel', default='debug', show_default=True,
-        type=click.Choice(['critical', 'error', 'warning', 'info', 'debug'])),
-    click.version_option(version="0.1.0", prog_name="blendit", message="%(prog)s, version %(version)s")
-]
+# pipe group
+@main.group(invoke_without_command=False)
+@click.pass_context
+def pipe(ctx, *args, **kwargs):
+    pass
 
 
 # profile kmer
 @profile.command()
 @click.argument('assembly', type=str)
-@click.option('-k', '--kmer_size', type=click.Choice(['4', '5']), default='5', 
-    show_default=True, help="k-mer size")
-@click.option('-c', '--cpus', type=int, default=20, show_default=True, help="number of cores to use for kmer counting")
+@click.option('-k', '--kmer_size', type=click.Choice(['4', '5']), default='5', show_default=True, help="k-mer size")
+@click.option('--kmerfreq_scale_func', type=click.Choice(['none', 'sqrt', 'cbrt', 'log10']),
+              default='cbrt', show_default=True, help="k-mer freq scale function")
 @add_options(shared_options)
-def kmer(assembly, kmer_size, prefix, output_dir, force, cpus, loglevel, *args, **kwargs):
+def kmer(assembly, kmer_size, kmerfreq_scale_func, prefix, output_dir, force, threads, loglevel, *args, **kwargs):
     """k-mer frequency profiling"""
     emit_subcommand_info("profile kmer", loglevel)
 
     prefix = prefix + "_kmer"
     output_dir = os.path.join(output_dir, "kmer")
 
-    # run kmer freq calculation
+    # run kmer frequency calculation
     _logger.info("calculating kmer frequency ...")
-    kmer_freq_file = get_kmer_counts_for_contigs(input_contig_file=assembly, output_dir=output_dir, prefix=prefix,
-                                                 k=kmer_size, cpus=cpus, force=force)
+    kmer_freq_file = get_kmer_frequencies_for_contigs(input_contig_file=assembly, output_dir=output_dir, prefix=prefix,
+                                                      k=kmer_size, cpus=threads, force=force)
 
     # normalization
     _logger.info("normalizing kmer frequency ...")
-    norm_kmer_file = normalizer(input_freq_file=kmer_freq_file, output_dir=output_dir, prefix=prefix, scale_func=np.cbrt)
+    norm_kmer_file = normalizer(input_freq_file=kmer_freq_file, output_dir=output_dir, prefix=prefix,
+                                scale_func=kmerfreq_scale_func)
+
+    return norm_kmer_file
 
 
 # profile codon
 @profile.command()
 @click.argument('assembly', type=str)
+@click.option('--codonfreq_scale_func', type=click.Choice(['none', 'sqrt', 'cbrt', 'log10']),
+              default='cbrt', show_default=True, help="codon freq scale function")
 @add_options(shared_options)
-def codon(assembly, prefix, output_dir, force, loglevel, *args, **kwargs):
+def codon(assembly, codonfreq_scale_func, prefix, output_dir, force, loglevel, *args, **kwargs):
     """codon usage profiling"""
     emit_subcommand_info("profile codon", loglevel)
 
@@ -130,15 +150,20 @@ def codon(assembly, prefix, output_dir, force, loglevel, *args, **kwargs):
 
     # normalization
     _logger.info("normalizing codon frequency ...")
-    norm_codon_file = normalizer(input_freq_file=codon_freq_file, output_dir=output_dir, prefix=prefix, scale_func=np.cbrt)
+    norm_codon_file = normalizer(input_freq_file=codon_freq_file, output_dir=output_dir, prefix=prefix,
+                                 scale_func=codonfreq_scale_func)
+
+    return norm_codon_file
 
 
 # profile cov
 @profile.command()
 @click.argument('bam_files', type=str, nargs=-1)
+@click.option('--cov_scale_func', type=click.Choice(['none', 'sqrt', 'cbrt', 'log10']),
+              default='log10', show_default=True, help="coverage scale function")
 @click.option('-l', '--read_length', type=int, default=250, show_default=True, help="read length for log-scaled transformation")
 @add_options(shared_options)
-def cov(bam_files, prefix, output_dir, force, loglevel, *args, **kwargs):
+def cov(bam_files, cov_scale_func, prefix, output_dir, threads, force, loglevel, *args, **kwargs):
     """read coverage profiling"""
     emit_subcommand_info("profile cov", loglevel)
 
@@ -146,14 +171,17 @@ def cov(bam_files, prefix, output_dir, force, loglevel, *args, **kwargs):
     output_dir = os.path.join(output_dir, "cov")
 
     # run bamcov
-    _logger.info("calculating contig coverage using bamcov ...")
-    length_file, depth_file = calculate_contig_depth_from_bam_files(bam_files, output_dir=output_dir,
+    _logger.info("parallel calculating contig coverage using bamcov ...")
+    length_file, depth_file = parallel_calculate_contig_depth_from_bam_files(bam_files, output_dir=output_dir,
                                                                     output_prefix=prefix, min_read_len=30,
-                                                                    min_MQ=0, min_BQ=0, force=force)
+                                                                    min_MQ=0, min_BQ=0, cpus=threads, force=force)
 
     # normalization
     _logger.info("normalizing contig coverage ...")
-    norm_depth_file = normalize_contig_depth(length_file, depth_file, output_dir, prefix, scale_func=np.log10, read_length=250)
+    norm_depth_file = normalize_contig_depth(length_file, depth_file, output_dir, prefix,
+                                             scale_func=cov_scale_func, read_length=250)
+
+    return length_file, norm_depth_file
 
 
 # bin hdbscan
@@ -169,8 +197,6 @@ def cov(bam_files, prefix, output_dir, force, loglevel, *args, **kwargs):
     help="minimum contig length threshold y")
 @click.option('-s', '--length_step', type=int, default=1000, show_default=True,
     help="minimum contig length increasement step")
-@click.option('-t', '--threads', type=int, default=20, show_default=True,
-    help="maximum number of threads to use when available")
 @click.option('-d', '--dimred', default='both', show_default=True,
              type=click.Choice(['tsne', 'umap', 'both']),
              help="dimension reduction methods, can be 'tsne', 'umap' or 'both'")
@@ -193,43 +219,15 @@ def hdbscan(kmerfreq_file, codonfreq_file, depth_file, contig_length_file, assem
     merged_profile = combine_feature_tables([kmerfreq_file, codonfreq_file, depth_file], output_dir=output_dir, prefix=prefix, force=force)
     #merged_profile = os.path.join(output_dir, prefix+"_merged.tsv")
 
-    feature_files = []
-    if dimred in ('tsne', 'both'):
-        # run t-SNE
-        _logger.info("computing t-SNE coordinates after PCA ...")
-        tsne_file = compute_PCA_tSNE_coordinates(merged_profile, output_dir, prefix+"_merged_{}d".format(dimensions), threads=threads, n_components=dimensions, pca_components=components)
-        #tsne_file =  os.path.join(output_dir, prefix+"_merged_{}d.tsne".format(dimensions))
-        feature_files.append(tsne_file)
-    if dimred in ('umap', 'both'):
-        # run UMAP
-        _logger.info("computing UMAP coordinates after PCA ...")
-        umap_file = compute_PCA_UMAP_coordinates(merged_profile, output_dir, prefix+"_merged_{}d".format(dimensions), n_components=dimensions, pca_components=components)
-        #umap_file = os.path.join(output_dir, prefix + "_merged_{}d.umap".format(dimensions))
-        feature_files.append(umap_file)
+    # compute embeddings
+    feature_files = compute_embeddings(merged_profile=merged_profile, output_dir=output_dir, prefix=prefix, 
+                    threads=threads, n_components=dimensions, pca_components=components, dimred=dimred)
 
-
-    scaffold2bin_files = []
-    bin_folders = []
-    for feature_file in feature_files:
-        dimred_method = feature_file.split('.')[-1]
-        _logger.info("clustering using hdbscan based on {0} feature file ...".format(dimred_method))
-        length_df = pd.read_csv(contig_length_file, sep="\t", index_col=0, header=0)
-        for min_length in range(min_length_x, min_length_y+1, length_step):
-            _logger.info("clustering using hdbscan with contigs >= {l} ...".format(l=min_length))
-            drop_length_df = length_df[length_df.Length < min_length]
-            drop_contig_list = drop_length_df.index
-            hdbscan_cluster_file = hdbscan_clustering(feature_file, output_dir, prefix+"_merged_{0}_min_{1}".format(dimred_method, min_length), excluding_contig_file_or_list=drop_contig_list, min_cluster_size=10)
-            # generate bins
-            _logger.info("generating bins for contigs >= {l} ...".format(l=min_length))
-            generate_bins(hdbscan_cluster_file, assembly, output_dir, bin_folder=prefix+"_merged_{0}_min_{1}".format(dimred_method, min_length))
-            # generate scaffold2bin files
-            _logger.info("generating scaffold2bin file for contigs >= {0} ...".format(min_length))
-            bin_folder = os.path.join(output_dir, prefix+"_merged_{0}_min_{1}".format(dimred_method, min_length))
-            scaffold2bin = bin_folder + "_scaffold2bin.tsv"
-            bin_folders.append(bin_folder)
-            scaffold2bin_files.append(scaffold2bin)
-            scaffolds_to_bins(bin_folder, scaffold2bin, suffix="fa")
-        
+    # iterative hdbcan binning
+    scaffold2bin_files, bin_folders = iterative_hdbscan_binning(embeddings=feature_files, assembly=assembly, 
+                                      contig_length_file=contig_length_file, output_dir=output_dir, prefix=prefix, 
+                                      min_length_x=min_length_x, min_length_y=min_length_y, length_step=length_step,
+                                      min_cluster_size=10)
 
     # run DAS_Tool
     _logger.info("integrating using DAS_Tool ...")
@@ -239,6 +237,187 @@ def hdbscan(kmerfreq_file, codonfreq_file, depth_file, contig_length_file, assem
                  output_dir=output_dir, output_prefix=prefix+"_dastool", proteins=proteins,
                  search_engine='usearch', write_bin_evals=1, create_plots=1, write_bins=1, threads=threads,
                  score_threshold=0.4, duplicate_penalty=0.4, megabin_penalty=0.3)
+
+
+# bin dbscan
+@bin.command()
+@click.argument('kmerfreq_file', type=str)
+@click.argument('codonfreq_file', type=str)
+@click.argument('depth_file', type=str)
+@click.argument('contig_length_file', type=str)
+@click.argument('assembly', type=str)
+@click.option('-x', '--min_length_x', type=int, default=2000, show_default=True,
+    help="minimum contig length threshold x")
+@click.option('-y', '--min_length_y', type=int, default=10000, show_default=True, 
+    help="minimum contig length threshold y")
+@click.option('-s', '--length_step', type=int, default=1000, show_default=True,
+    help="minimum contig length increasement step")
+@click.option('-d', '--dimred', default='both', show_default=True,
+             type=click.Choice(['tsne', 'umap', 'both']),
+             help="dimension reduction methods, can be 'tsne', 'umap' or 'both'")
+@click.option('--dimensions', type=int, default=3, show_default=True,
+             help="number of dimensions to keep for embedding")
+@click.option('--components', type=int, default=100, show_default=True,
+             help="maximum PCA components to keep")
+@add_options(shared_options)
+def dbscan(kmerfreq_file, codonfreq_file, depth_file, contig_length_file, assembly, min_length_x, min_length_y, length_step,
+            threads, prefix, output_dir, force, loglevel, dimred, dimensions, components, *args, **kwargs):
+    """dbscan binning"""
+    emit_subcommand_info("bin dbscan", loglevel)
+
+    prefix = prefix + "_dbscan"
+    output_dir = os.path.join(output_dir, "dbscan")
+
+
+    # merge kmer, codon and depth profiles
+    _logger.info("combining kmer, codon and coverage profiles ...")
+    #merged_profile = combine_feature_tables([kmerfreq_file, codonfreq_file, depth_file], output_dir=output_dir, prefix=prefix, force=force)
+    merged_profile = os.path.join(output_dir, prefix+"_merged.tsv")
+
+    # compute embeddings
+    #feature_files = compute_embeddings(merged_profile=merged_profile, output_dir=output_dir, prefix=prefix, 
+    #                threads=threads, n_components=dimensions, pca_components=components, dimred=dimred)
+    feature_files = [os.path.join(output_dir, prefix+"_merged_2d.tsne")]
+
+    # iterative dbcan binning
+    #scaffold2bin_files, bin_folders = iterative_dbscan_binning(embeddings=feature_files, assembly=assembly,
+    #                                  contig_length_file=contig_length_file, output_dir=output_dir, prefix=prefix,
+    #                                  min_length_x=min_length_x, min_length_y=min_length_y, length_step=length_step,
+    #                                  min_cluster_size=10)
+
+    # test class
+    scaffold2bin_files, bin_folders = iterative_dbscan_clustering(embeddings=feature_files, assembly=assembly,
+                                      contig_length_file=contig_length_file, output_dir=output_dir, prefix=prefix,
+                                      min_length_x=min_length_x, min_length_y=min_length_y, length_step=length_step)
+
+    # run DAS_Tool
+    _logger.info("integrating using DAS_Tool ...")
+    proteins = codonfreq_file.replace("_norm.tsv", ".prot")
+    labels = [os.path.basename(os.path.normpath(bin_folder)) for bin_folder in bin_folders]
+    run_das_tool(bins=','.join(scaffold2bin_files), contigs=assembly, labels=','.join(labels),
+                 output_dir=output_dir, output_prefix=prefix+"_dastool", proteins=proteins,
+                 search_engine='usearch', write_bin_evals=1, create_plots=1, write_bins=1, threads=threads,
+                 score_threshold=0.4, duplicate_penalty=0.4, megabin_penalty=0.3)
+
+# bin optics
+@bin.command()
+@click.argument('kmerfreq_file', type=str)
+@click.argument('codonfreq_file', type=str)
+@click.argument('depth_file', type=str)
+@click.argument('contig_length_file', type=str)
+@click.argument('assembly', type=str)
+@click.option('-x', '--min_length_x', type=int, default=2000, show_default=True,
+    help="minimum contig length threshold x")
+@click.option('-y', '--min_length_y', type=int, default=10000, show_default=True,
+    help="minimum contig length threshold y")
+@click.option('-s', '--length_step', type=int, default=1000, show_default=True,
+    help="minimum contig length increasement step")
+@click.option('-d', '--dimred', default='both', show_default=True,
+             type=click.Choice(['tsne', 'umap', 'both']),
+             help="dimension reduction methods, can be 'tsne', 'umap' or 'both'")
+@click.option('--dimensions', type=int, default=3, show_default=True,
+             help="number of dimensions to keep for embedding")
+@click.option('--components', type=int, default=100, show_default=True,
+             help="maximum PCA components to keep")
+@add_options(shared_options)
+def optics(kmerfreq_file, codonfreq_file, depth_file, contig_length_file, assembly, min_length_x, min_length_y, length_step,
+            threads, prefix, output_dir, force, loglevel, dimred, dimensions, components, *args, **kwargs):
+    """optics binning"""
+    emit_subcommand_info("bin optics", loglevel)
+
+    prefix = prefix + "_optics"
+    output_dir = os.path.join(output_dir, "optics")
+
+
+    # merge kmer, codon and depth profiles
+    _logger.info("combining kmer, codon and coverage profiles ...")
+    #merged_profile = combine_feature_tables([kmerfreq_file, codonfreq_file, depth_file], output_dir=output_dir, prefix=prefix, force=force)
+    merged_profile = os.path.join(output_dir, prefix+"_merged.tsv")
+
+    # compute embeddings
+    #feature_files = compute_embeddings(merged_profile=merged_profile, output_dir=output_dir, prefix=prefix,
+    #                threads=threads, n_components=dimensions, pca_components=components, dimred=dimred)
+    feature_files = [os.path.join(output_dir, prefix+"_merged_2d.tsne")]
+
+    # iterative dbcan binning
+    scaffold2bin_files, bin_folders = iterative_optics_binning(embeddings=feature_files, assembly=assembly,
+                                      contig_length_file=contig_length_file, output_dir=output_dir, prefix=prefix,
+                                      min_length_x=min_length_x, min_length_y=min_length_y, length_step=length_step,
+                                      min_cluster_size=10)
+
+    # run DAS_Tool
+    _logger.info("integrating using DAS_Tool ...")
+    proteins = codonfreq_file.replace("_norm.tsv", ".prot")
+    labels = [os.path.basename(os.path.normpath(bin_folder)) for bin_folder in bin_folders]
+    run_das_tool(bins=','.join(scaffold2bin_files), contigs=assembly, labels=','.join(labels),
+                 output_dir=output_dir, output_prefix=prefix+"_dastool", proteins=proteins,
+                 search_engine='usearch', write_bin_evals=1, create_plots=1, write_bins=1, threads=threads,
+                 score_threshold=0.4, duplicate_penalty=0.4, megabin_penalty=0.3)
+
+
+
+
+
+
+
+
+
+
+# pipe ph
+@pipe.command()
+@click.argument('assembly', type=str)
+@click.argument('bam_files', type=str, nargs=-1)
+@click.option('-k', '--kmer_size', type=click.Choice(['4', '5']), default='5',
+    show_default=True, help="k-mer size")
+@click.option('--kmerfreq_scale_func', type=click.Choice(['none', 'sqrt', 'cbrt', 'log10']),
+              default='cbrt', show_default=True, help="k-mer freq scale function")
+@click.option('--codonfreq_scale_func', type=click.Choice(['none', 'sqrt', 'cbrt', 'log10']),
+              default='cbrt', show_default=True, help="codon freq scale function")
+@click.option('--cov_scale_func', type=click.Choice(['none', 'sqrt', 'cbrt', 'log10']),
+              default='log10', show_default=True, help="coverage scale function")
+@click.option('-x', '--min_length_x', type=int, default=2000, show_default=True,
+    help="minimum contig length threshold x")
+@click.option('-y', '--min_length_y', type=int, default=10000, show_default=True,
+    help="minimum contig length threshold y")
+@click.option('-s', '--length_step', type=int, default=1000, show_default=True,
+    help="minimum contig length increasement step")
+@click.option('-t', '--threads', type=int, default=20, show_default=True,
+    help="maximum number of threads to use when available")
+@click.option('-d', '--dimred', default='both', show_default=True,
+             type=click.Choice(['tsne', 'umap', 'both']),
+             help="dimension reduction methods, can be 'tsne', 'umap' or 'both'")
+@click.option('--dimensions', type=int, default=3, show_default=True,
+             help="number of dimensions to keep for embedding")
+@click.option('--components', type=int, default=100, show_default=True,
+             help="maximum PCA components to keep")
+@click.option('-l', '--read_length', type=int, default=250, show_default=True, help="read length for log-scaled transformation")
+@add_options(shared_options)
+@click.pass_context
+def ph(ctx, assembly, bam_files, prefix, output_dir, kmer_size, kmerfreq_scale_func, codonfreq_scale_func, cov_scale_func,
+       min_length_x, min_length_y, length_step, threads, dimred, dimensions, components, read_length, force, loglevel,
+       *args, **kwargs):
+    """run feature profiling and hdbscan clustering pipeline """
+
+    emit_subcommand_info("pipe phh", loglevel)
+
+    kmerfreq_file = ctx.invoke(kmer, assembly=assembly, kmer_size=kmer_size, kmerfreq_scale_func=kmerfreq_scale_func,
+                               codonfreq_scale_func=codonfreq_scale_func, cov_scale_func=cov_scale_func,
+                               prefix=prefix, output_dir=output_dir, force=force, cpus=threads, loglevel=loglevel,
+                               *args, **kwargs)
+    #kmerfreq_file = os.path.join(output_dir, "kmer", prefix + "_kmer_norm.tsv")
+    #codonfreq_file = ctx.invoke(codon, assembly=assembly, prefix=prefix, output_dir=output_dir,
+    #                            force=force, loglevel=loglevel, *args, **kwargs)
+    codonfreq_file = os.path.join(output_dir, "codon", prefix + "_codon_norm.tsv")
+    #contig_length_file, depth_file = ctx.invoke(cov, bam_files=bam_files, prefix=prefix, output_dir=output_dir,
+    #                                            threads=threads, force=force, loglevel=loglevel, *args, **kwargs)
+    depth_file = os.path.join(output_dir, "cov", prefix + "_cov_norm.tsv")
+    contig_length_file = os.path.join(output_dir, "cov", prefix + "_cov_contig_length.tsv")
+
+    ctx.invoke(hdbscan, kmerfreq_file=kmerfreq_file, codonfreq_file=codonfreq_file, depth_file=depth_file,
+               contig_length_file=contig_length_file, assembly=assembly, min_length_x=min_length_x, min_length_y=min_length_y,
+                length_step=length_step, threads=threads, prefix=prefix, output_dir=output_dir, force=force,
+               loglevel=loglevel, dimred=dimred, dimensions=dimensions, components=components, *args, **kwargs)
+
 
 if __name__ == "__main__":
     sys.exit(main()) 
