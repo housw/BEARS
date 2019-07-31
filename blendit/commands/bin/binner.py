@@ -5,7 +5,9 @@ import logging
 import pandas as pd
 from Bio import SeqIO
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from blendit.utils.common import emit_file_exist_warning
+import warnings
+warnings.filterwarnings(action='ignore', category=DeprecationWarning)
 
 
 _logger = logging.getLogger("BlendIt")
@@ -127,7 +129,7 @@ class Binner(ABC):
 
 class IterBinner(object):
 
-    def __init__(self, binner_cls, embeddings, assembly, contig_length_file, output_dir, prefix,
+    def __init__(self, binner_cls, embeddings, assembly, contig_length_file, output_dir, prefix, force=False,
                  min_length_x=2000, min_length_y=10000, length_step=1000, binner_param_dict={}):
         self.binner_cls = binner_cls
         self.binner_name = binner_cls.name
@@ -136,6 +138,7 @@ class IterBinner(object):
         self.contig_length_file = contig_length_file
         self.output_dir = output_dir
         self.prefix = prefix
+        self.force = force
         self.min_length_x = min_length_x
         self.min_length_y = min_length_y
         self.length_step = length_step
@@ -144,16 +147,16 @@ class IterBinner(object):
     def bin(self, embedding_df, length_df, min_length=2000, embedding_method='tsne', binner_param_dict={'n_jobs': 10}):
 
         # initialize a binner
-        binner = self.binner_cls(assembly=self.assembly, length_df=length_df, embedding_df=embedding_df, 
-                                output_dir=self.output_dir, prefix=self.prefix, min_length=min_length, 
+        binner = self.binner_cls(assembly=self.assembly, length_df=length_df, embedding_df=embedding_df,
+                                output_dir=self.output_dir, prefix=self.prefix, min_length=min_length,
                                 embedding_method=embedding_method)
         # generate bin seqs and scaffold2bin file
         bin_folder, scaffold2bin = binner(binner_param_dict)
-    
+
         return bin_folder, scaffold2bin
 
-    def __call__(self):
-        
+    def __call__(self, cpus=10):
+
         # iterative binning
         scaffold2bin_files = []
         bin_folders = []
@@ -164,20 +167,16 @@ class IterBinner(object):
             length_df = pd.read_csv(self.contig_length_file, sep="\t", index_col=0, header=0)
             for min_length in range(self.min_length_x, self.min_length_y+1, self.length_step):
                 _logger.info("clustering using {0} with contigs >= {1} ...".format(self.binner_name, min_length))
-                bin_folder, scaffold2bin = self.bin(embedding_df, length_df, min_length=min_length, 
-                                                    embedding_method=dimred_method, 
-                                                    binner_param_dict=self.binner_param_dict)
+                bin_folder = os.path.join(self.output_dir, self.prefix + "_{0}_min_{1}".format(dimred_method, min_length))
+                scaffold2bin = bin_folder + "_scaffold2bin.tsv"
+                try:
+                    scaffold2bin = emit_file_exist_warning(filename=scaffold2bin, force=self.force)
+                except Exception as e:
+                    _logger.info(e)
+                    bin_folder, scaffold2bin = self.bin(embedding_df, length_df, min_length=min_length,
+                                                        embedding_method=dimred_method,
+                                                        binner_param_dict=self.binner_param_dict)
                 scaffold2bin_files.append(scaffold2bin)
                 bin_folders.append(bin_folder)
 
         return scaffold2bin_files, bin_folders
-
-
-
-def generate_bins(cluster_file, assembly, output_dir, bin_folder):
-    pass
-
-def scaffolds_to_bins(bin_folder, scaffold2bin, suffix="fa"):
-    pass
-
-

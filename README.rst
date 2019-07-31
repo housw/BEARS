@@ -80,9 +80,12 @@ Usage
 
     -> blendit bin COMMAND [ARGS] ...
         -> blendit bin hdbscan:    run hdbscan binning
+        -> blendit bin dbscan:     run dbscan binning
+        -> blendit bin optics:     run optics binning
 
     -> blendit pipe COMMAND [ARGS] ...
         -> blendit pipe ph:        run all feature profilings and hdbscan clustering
+        -> blendit pipe pd:        run all feature profilings and dbscan clustering
 
     Options:
         --help  Show this message and exit.
@@ -251,11 +254,6 @@ Example
 TODO
 ----
 
-:bin subcommands:
-
-- ``blendit bin dbscan``
-
-
 :post subcommands:
 
 - ``blendit post phylo``
@@ -267,7 +265,3 @@ TODO
 
 - ``blendit viz tree``
 
-
-:pipe subcommands:
-
-- ``blendit pipe pd``

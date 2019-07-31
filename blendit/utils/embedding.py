@@ -10,6 +10,7 @@ from sklearn import preprocessing
 from sklearn import decomposition
 from MulticoreTSNE import MulticoreTSNE as multiTSNE
 import umap
+from .common import emit_file_exist_warning
 from numba.errors import (NumbaDeprecationWarning, NumbaPendingDeprecationWarning,
                           NumbaDeprecationWarning, NumbaPerformanceWarning, NumbaWarning)
 warnings.simplefilter('ignore', category=NumbaWarning)
@@ -123,21 +124,29 @@ def compute_PCA_UMAP_embeddings(input_feature_table, output_dir, prefix, n_compo
     return output_file
 
 
-def compute_embeddings(merged_profile, output_dir, prefix, threads, n_components, pca_components, dimred=['tsne', 'umap', 'both']):
+def compute_embeddings(merged_profile, output_dir, prefix, threads, n_components, pca_components, dimred=['tsne', 'umap', 'both'], force=False):
     """ a wrap function to compute tsne, umap or both  embeddings
     """
     embeddings = []
     if dimred in ('tsne', 'both'):
         # run t-SNE
         _logger.info("computing t-SNE embeddings after PCA ...")
-        tsne_file = compute_PCA_tSNE_embeddings(merged_profile, output_dir, prefix+"_merged_{}d".format(n_components), threads=threads, n_components=n_components, pca_components=pca_components)
-        #tsne_file =  os.path.join(output_dir, prefix+"_merged_{}d.tsne".format(dimensions))
+        tsne_file =  os.path.join(output_dir, prefix+"_merged_{}d.tsne".format(n_components))
+        try:
+            tsne_file = emit_file_exist_warning(filename=tsne_file, force=force)
+        except Exception as e:
+            _logger.info(e)
+            tsne_file = compute_PCA_tSNE_embeddings(merged_profile, output_dir, prefix+"_merged_{}d".format(n_components), threads=threads, n_components=n_components, pca_components=pca_components)
         embeddings.append(tsne_file)
     if dimred in ('umap', 'both'):
         # run UMAP
         _logger.info("computing UMAP embeddings after PCA ...")
-        umap_file = compute_PCA_UMAP_embeddings(merged_profile, output_dir, prefix+"_merged_{}d".format(n_components), n_components=n_components, pca_components=pca_components)
-        #umap_file = os.path.join(output_dir, prefix + "_merged_{}d.umap".format(dimensions))
+        umap_file = os.path.join(output_dir, prefix + "_merged_{}d.umap".format(n_components))
+        try:
+            umap_file = emit_file_exist_warning(filename=umap_file, force=force)
+        except Exception as e:
+            _logger.info(e)
+            umap_file = compute_PCA_UMAP_embeddings(merged_profile, output_dir, prefix+"_merged_{}d".format(n_components), n_components=n_components, pca_components=pca_components)
         embeddings.append(umap_file)
-    
+
     return embeddings

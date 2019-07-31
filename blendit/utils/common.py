@@ -142,7 +142,7 @@ def command_logger(func):
     return wrapper
 
 
-# credit: 
+# credit:
 # https://stackoverflow.com/questions/47972638/how-can-i-define-the-order-of-click-sub-commands-in-help/47984810#47984810
 class SpecialHelpOrder(click.Group):
 
@@ -160,7 +160,7 @@ class SpecialHelpOrder(click.Group):
         return (c[1] for c in sorted(
             (self.help_priorities.get(command, 1), command)
             for command in commands))
-    
+
     def command(self, *args, **kwargs):
         """Behaves the same as `click.Group.command()` except capture
         a priority for listing command names in help.
@@ -252,12 +252,10 @@ def get_prefix(input_file):
     return prefix
 
 
-def normalizer(input_freq_file, output_dir, prefix, scale_func='none', norm='l2', spike=1e-10):
+def normalizer(input_freq_file, output_file, scale_func='none', norm='l2', spike=1e-10):
     """ 1) scale the data with numpy function
         2) normalize the data using Normalizer
     """
-
-    output_norm_freq_file = os.path.join(output_dir, prefix+"_norm.tsv")
 
     freq_df = pd.read_csv(input_freq_file, sep="\t", index_col=0, header=0)
     freq_df.sort_index(inplace=True)
@@ -286,37 +284,22 @@ def normalizer(input_freq_file, output_dir, prefix, scale_func='none', norm='l2'
     scaler = preprocessing.Normalizer(norm=norm)
     scaled_freq_df = scaler.fit_transform(transform_freq_df)
     scaled_freq_df = pd.DataFrame(scaled_freq_df, columns=transform_freq_df.columns, index=transform_freq_df.index)
-    scaled_freq_df.to_csv(output_norm_freq_file, sep="\t", header=True, index=True, float_format='%.6f')
-
-    return output_norm_freq_file
-
-
-def combine_feature_tables(feature_file_list, output_dir, prefix, force=False):
-
-    # output file handling
-    if not folder_exists(output_dir):
-        create_directory(output_dir)
-
-    output_file = os.path.join(output_dir, prefix + "_merged.tsv")
-    #if os.path.exists(output_file):
-    #    if not force:
-    #        err_msg = "{0} exists, use --force if you want to re-generate the merged feature table".format(output_file)
-    #        _logger.warn(err_msg)
-    #        raise CommandException(err_msg)
-    #    else:
-    #        warn_msg = "re-generate the merged feature table, {0} will be over-writen".format(output_file)
-    #        _logger.warn(warn_msg)
-
-    all_feature_dfs = []
-    for feature_file in feature_file_list:
-        curr_df = pd.read_csv(feature_file, sep='\t', header=0, index_col=0)
-        curr_df.sort_index(inplace=True)
-        all_feature_dfs.append(curr_df)
-
-    combined_df = pd.concat(all_feature_dfs, axis=1, sort=True)
-    combined_df.index.name = "Contig_ID"
-    combined_df.to_csv(output_file, sep="\t", header=True, index=True)
+    scaled_freq_df.to_csv(output_file, sep="\t", header=True, index=True, float_format='%.6f')
 
     return output_file
 
 
+def emit_file_exist_warning(filename, force=False):
+    if os.path.exists(filename):
+        if not force:
+            err_msg = "{0} file exists, BlendIt will use the pre-computed {0}, " \
+                      "please note this might cause unexpected results, " \
+                      "use --force if you want to re-generate it".format(filename)
+            _logger.warn(err_msg)
+            return filename
+        else:
+            warn_msg = "{0} file exists, BlendIt will re-compute and over-write it, " \
+                       "remove --force if you want to re-use the pre-computed file".format(filename)
+            raise Exception(warn_msg)
+    else:
+        raise Exception("the result will be written to file {0}".format(filename))
