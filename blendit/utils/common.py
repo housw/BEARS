@@ -205,7 +205,7 @@ class CommandWrapper(object):
             proc = subprocess.Popen(self.cmd_line, shell=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             with proc.stdout as stdout:
                 for line in iter(stdout.readline, b""):
-                    _logger.debug(" [" + self.name +"]: " + line.decode('ASCII').strip())
+                    _logger.debug(" [" + self.name +"]: " + line.decode('utf-8').strip())
             proc_exitcode = proc.wait()
             if proc_exitcode:
                 _logger.error("run {name} failed with error code {err_code}\n".format(name=self.name, err_code=str(proc_exitcode)))
@@ -285,6 +285,15 @@ def normalizer(input_freq_file, output_file, scale_func='none', norm='l2', spike
     scaled_freq_df = scaler.fit_transform(transform_freq_df)
     scaled_freq_df = pd.DataFrame(scaled_freq_df, columns=transform_freq_df.columns, index=transform_freq_df.index)
     scaled_freq_df.to_csv(output_file, sep="\t", header=True, index=True, float_format='%.6f')
+
+    '''
+    #  scales the data according to the interquantile range using sklearn.preprocessing.RobustScaler()
+    scaler = preprocessing.RobustScaler()
+    scaled_freq_df = scaler.fit_transform(transform_freq_df)
+    scaled_freq_df = pd.DataFrame(scaled_freq_df, columns=transform_freq_df.columns, index=transform_freq_df.index)
+    scaled_freq_df.to_csv(output_file, sep="\t", header=True, index=True, float_format='%.6f')
+    '''
+
 
     return output_file
 

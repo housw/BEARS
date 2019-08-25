@@ -307,7 +307,7 @@ def ph(ctx, assembly, bam_files, prefix, output_dir, kmer_size, kmerfreq_scale_f
     emit_subcommand_info("pipe ph", loglevel)
 
     kmerfreq_file, codonfreq_file, contig_length_file, depth_file = blendit_get_profiles(assembly=assembly, bam_files=bam_files,
-                     prefix=profile, output_dir=output_dir, kmer_size=kmer_size, kmerfreq_scale_func=kmerfreq_scale_func,
+                     prefix=prefix, output_dir=output_dir, kmer_size=kmer_size, kmerfreq_scale_func=kmerfreq_scale_func,
                      codonfreq_scale_func=codonfreq_scale_func, genetic_code=11, cov_scale_func=cov_scale_func, min_read_len=30,
                      min_MQ=0, min_BQ=0, threads=threads, read_length=read_length, force=force)
 

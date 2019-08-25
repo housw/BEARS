@@ -108,33 +108,29 @@ def parallel_calculate_contig_depth_from_bam_files(input_bam_file_list, output_d
 
     _logger.info("parallel calculating contig coverage using bamcov ...")
     try:
-        emit_file_exist_warning(filename=output_depth_file, force=force)
+        emit_file_exist_warning(filename=output_depth_norm, force=force)
     except Exception as e:
         _logger.info(e)
         sample_names, depth_files = parallel_bamcov(input_bam_file_list, output_dir, min_read_len=min_read_len,
                                                     min_MQ=min_MQ, min_BQ=min_BQ, cpus=cpus, force=force)
         length_df, depth_df = write_length_and_depth_file(sample_names, depth_files, output_length_file, output_depth_file)
 
-    length_df.sort_index(inplace=True)
-    depth_df.sort_index(inplace=True)
+        length_df.sort_index(inplace=True)
+        depth_df.sort_index(inplace=True)
 
-    # add one read to each contig as prior
-    _logger.info("spiking one aligned read to each contig ...")
-    try:
-        emit_file_exist_warning(filename=output_depth_prior, force=force)
-    except Exception as e:
-        _logger.info(e)
-        prior_df = read_length / length_df.Length
-        for col in depth_df.columns:
-            depth_df[col] += prior_df
-        depth_df.to_csv(output_depth_prior, sep="\t", header=True, index=True)
+        # add one read to each contig as prior
+        _logger.info("spiking one aligned read to each contig ...")
+        try:
+            emit_file_exist_warning(filename=output_depth_prior, force=force)
+        except Exception as e:
+            _logger.info(e)
+            prior_df = read_length / length_df.Length
+            for col in depth_df.columns:
+                depth_df[col] += prior_df
+            depth_df.to_csv(output_depth_prior, sep="\t", header=True, index=True)
 
-    # log-scale transform the data, run normalization
-    _logger.info("normalizing depth profiles ...")
-    try:
-        emit_file_exist_warning(filename=output_depth_norm, force=force)
-    except Exception as e:
-        _logger.info(e)
+        # log-scale transform the data, run normalization
+        _logger.info("normalizing depth profiles ...")
         output_depth_norm = normalizer(input_freq_file=output_depth_prior, output_file=output_depth_norm,
                                        scale_func=scale_func)
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""Top-level package for BEARS."""
+"""Top-level package for BlendIt."""
 
 __author__ = """Shengwei Hou"""
 __email__ = 'housw2010@gmail.com'
