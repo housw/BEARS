@@ -11,7 +11,6 @@ BlendIt
 **BlendIt**: Binning metagenomic contigs via length-dependent Iterative clustering and integration
 
 * Free software: GNU General Public License v3
-* Documentation: https://blendit.readthedocs.io.
 
 
 
