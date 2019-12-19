@@ -15,6 +15,7 @@ pymer = "*"
 pandas = "*"
 umap-learn = "*"
 numpy = "*"
+pytest = "*"
 
 [requires]
 python_version = "3.6"

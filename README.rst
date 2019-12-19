@@ -8,17 +8,6 @@ BlendIt
 =======
 
 
-.. image:: https://img.shields.io/pypi/v/blendit.svg
-        :target: https://pypi.python.org/pypi/blendit
-
-.. image:: https://img.shields.io/travis/housw/blendit.svg
-        :target: https://travis-ci.org/housw/blendit
-
-.. image:: https://readthedocs.org/projects/blendit/badge/?version=latest
-        :target: https://blendit.readthedocs.io/en/latest/?badge=latest
-        :alt: Documentation Status
-
-
 **BlendIt**: Binning metagenomic contigs via length-dependent Iterative clustering and integration
 
 * Free software: GNU General Public License v3
