@@ -17,6 +17,5 @@ colorama==0.4.1
 hdbscan==0.8.22
 MulticoreTSNE==0.1
 pandas==0.24.2
-pymer==0.3.3
 umap-learn==0.3.9
 scikit-learn>=0.16
