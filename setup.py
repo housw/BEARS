@@ -8,16 +8,15 @@ from setuptools import setup, find_packages
 with open('README.rst') as readme_file:
     readme = readme_file.read()
 
-requirements = ['click>=6.0,<=6.7',
+requirements = ['click>=6.7',
                 'click-default-group>=1.2.1',
-                'pandas>=0.24.0',
+                'pandas>=1.0.3',
                 'scipy>=1.3.0',
                 'scikit-learn>=0.21.2',
                 'biopython>=1.68',
                 'colorama>=0.4.1',
                 'umap-learn>=0.3.9',
                 'hdbscan>=0.8.22',
-                'freqgen>=0.1.0',
                 'MulticoreTSNE>=0.1'
                 ]
 

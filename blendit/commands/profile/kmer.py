@@ -12,65 +12,24 @@ from blendit.utils.common import folder_exists
 from blendit.utils.common import create_directory
 from blendit.utils.common import normalizer
 from blendit.utils.common import emit_file_exist_warning
+from blendit.utils.kmercounter import kmer_counter
 
 
 _logger = logging.getLogger("BlendIt")
-
-base_fwd = "ACGT"
-base_rev = "TGCA"
-comp_tab = str.maketrans(base_fwd, base_rev)
-
-def initialize_kmer_dict(ksize=4, canonical=True):
-    kmer_dict = {}
-    for lett in product("ACGT", repeat=ksize):
-        kmer_fwd = "".join(lett)
-        if canonical:
-            kmer_rev = kmer_fwd.translate(comp_tab)[::-1]
-            if kmer_fwd < kmer_rev: 
-                kmer = kmer_fwd
-            else:
-                kmer = kmer_rev
-            kmer_dict[kmer] = 0
-        else:
-            kmer_dict[kmer_fwd] = 0
-    return kmer_dict
-
-
-def get_kmer_count_per_contig(contig, ksize=5, canonical=True):
-    """ count kmer for input contig
-    """
-
-    contig_name = contig.name
-    contig_seq = str(contig.seq).upper()
-    kmer_dict = initialize_kmer_dict(ksize, canonical)
-    for i in range(len(contig_seq) - ksize + 1):
-        kmer_fwd = contig_seq[i:(i+ksize)]
-        if 'N' in kmer_fwd: 
-            continue
-        kmer_rev = kmer_fwd.translate(comp_tab)[::-1]
-        if canonical:
-            if kmer_fwd < kmer_rev: 
-                kmer = kmer_fwd
-            else:
-                kmer = kmer_rev
-            kmer_dict[kmer] += 1
-        else:
-            kmer_dict[kmer_fwd] += 1
-            kmer_dict[kmer_rev] += 1
-
-    return (contig_name, kmer_dict)
 
 
 def get_kmer_counts_for_contigs(input_contig_file, output_file, k=5, cpus=10, canonical=True):
 
     # do kmer counting with multiple cores using mp
-    contig_iter = SeqIO.parse(input_contig_file, "fasta")
+    name_iter = (rec.name for rec in SeqIO.parse(input_contig_file, "fasta"))
+    seq_iter = (rec.seq for rec in SeqIO.parse(input_contig_file, "fasta"))
     pool = mp.Pool(processes=cpus)
-    func = partial(get_kmer_count_per_contig, ksize=int(k), canonical=canonical)
-    result_iter = pool.imap(func, contig_iter)
+    func = partial(kmer_counter, ksize=int(k), canonical=canonical)
+    result_iter = pool.imap(func, seq_iter)
 
-    # write
-    first_contig_name, first_kmer_dict = next(result_iter)
+    # write first record 
+    first_contig_name = next(name_iter)
+    first_kmer_dict = next(result_iter)
     header = sorted(first_kmer_dict.keys())
     first_count = [str(first_kmer_dict[kmer]) for kmer in header]
 
@@ -80,7 +39,8 @@ def get_kmer_counts_for_contigs(input_contig_file, output_file, k=5, cpus=10, ca
         # ask for forgiveness than permission
         while True:
             try:
-                contig_name, kmer_dict = next(result_iter)
+                contig_name = next(name_iter)
+                kmer_dict = next(result_iter)
                 count = [str(kmer_dict[kmer]) for kmer in header]
                 oh.write(contig_name +"\t"+ "\t".join(count)+"\n")
             except IndexError:

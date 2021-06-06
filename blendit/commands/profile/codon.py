@@ -2,38 +2,41 @@
 
 import os
 import logging
+import pandas as pd
 from Bio import SeqIO
 from collections import OrderedDict
 import multiprocessing as mp
 from functools import partial
-from freqgen import k_mer_frequencies, codon_frequencies, genetic_codes
 from blendit.utils.common import folder_exists
 from blendit.utils.common import create_directory
 from blendit.utils.common import CommandException
 from blendit.utils import run_prodigal
 from blendit.utils.common import normalizer
 from blendit.utils.common import emit_file_exist_warning
+from blendit.utils.kmercounter import kmer_counter
 
 
 _logger = logging.getLogger("BlendIt")
 
 
-def get_codon_frequency_per_contig(contig2seqs, cpus=10, mode="absolute", genetic_code=11):
+def get_codon_frequency_per_contig(contig2seqs, cpus=10, ksize=3, canonical=False):
 
     # do codon counting with multiple cores using mp
+    contigs = iter(contig2seqs.keys())
     seqs_iter = contig2seqs.values()
     pool = mp.Pool(processes=cpus)
-    func = partial(codon_frequencies, mode=mode, genetic_code=genetic_code)
+    func = partial(kmer_counter, ksize=int(ksize), canonical=canonical)
     result_iter = pool.imap(func, seqs_iter)
 
-    # get frequencies
+    # get codon frequencies 
     contig2frequencies = {}
-    contigs = iter(contig2seqs.keys())
     while True:
         try:
             contig = next(contigs)
-            frequency = next(result_iter)
-            contig2frequencies[contig] = frequency
+            codon_count_dict = next(result_iter)
+            total_counts = sum(codon_count_dict.values(), 0.0)
+            codon_freq_dict = {k: v/total_counts for k, v in codon_count_dict.items()} 
+            contig2frequencies[contig] = codon_freq_dict
         except IndexError:
             break
         except StopIteration:
@@ -94,18 +97,14 @@ def get_codon_frequencies_for_contigs(input_contig_file, output_dir, prefix, gen
     except Exception as e:
         _logger.info(e)
         contig2genes = get_genes_per_contig(prodigal_gene)
-        contig2frequencies = get_codon_frequency_per_contig(contig2seqs=contig2genes, cpus=cpus,
-                                                            mode="absolute", genetic_code=genetic_code)
-        with open(output_codon_freq, "w") as oh:
-            oh.write("Contig_ID"+"\t"+"\t".join(genetic_codes[genetic_code])+"\n")
-            for contig, frequency_dict in contig2frequencies.items():
-                line = [contig]
-                for codon in genetic_codes[genetic_code]:
-                    _frequency = frequency_dict.get(codon, 0)
-                    frequency = "{:.6f}".format(_frequency)
-                    line.append(frequency)
-                oh.write("\t".join(line)+"\n")
-
+        contig2frequencies = get_codon_frequency_per_contig(contig2seqs=contig2genes, cpus=cpus, ksize=3, canonical=False)
+        contigs = contig2frequencies.keys()
+        codon_dict_list = []
+        for contig in contigs:
+            codon_dict = contig2frequencies[contig]
+            codon_dict_list.append(codon_dict)
+        freq_df = pd.DataFrame(codon_dict_list, index=contigs)
+        freq_df.to_csv(output_codon_freq, sep="\t", index=True)
     _logger.info("normalizing codon frequency ...")
     try:
         emit_file_exist_warning(filename=output_codon_freq_norm, force=force)
