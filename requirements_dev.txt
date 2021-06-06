@@ -19,3 +19,4 @@ MulticoreTSNE==0.1
 pandas==0.24.2
 umap-learn==0.3.9
 scikit-learn>=0.16
+numba>=0.51.2

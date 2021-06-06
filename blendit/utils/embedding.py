@@ -11,14 +11,12 @@ from sklearn import decomposition
 from MulticoreTSNE import MulticoreTSNE as multiTSNE
 import umap
 from .common import emit_file_exist_warning
-from numba.errors import (NumbaDeprecationWarning, NumbaPendingDeprecationWarning,
-                          NumbaDeprecationWarning, NumbaPerformanceWarning, NumbaWarning)
-warnings.simplefilter('ignore', category=NumbaWarning)
-warnings.simplefilter('ignore', category=NumbaDeprecationWarning)
-warnings.simplefilter('ignore', category=NumbaPendingDeprecationWarning)
-warnings.simplefilter('ignore', category=NumbaPerformanceWarning)
+from numba import errors
+warnings.simplefilter('ignore', category=errors.NumbaWarning)
+warnings.simplefilter('ignore', category=errors.NumbaDeprecationWarning)
+warnings.simplefilter('ignore', category=errors.NumbaPendingDeprecationWarning)
+warnings.simplefilter('ignore', category=errors.NumbaPerformanceWarning)
 warnings.filterwarnings(action='ignore', category=DeprecationWarning, module='sklearn')  # message="divide by zero encountered in divide")
-
 
 _logger = logging.getLogger("BlendIt")
 
